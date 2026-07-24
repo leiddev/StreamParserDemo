@@ -77,9 +77,9 @@ public:
     SerialParserAdapter(const SerialParserAdapter&) = delete;
     SerialParserAdapter& operator=(const SerialParserAdapter&) = delete;
 
-    // Support move
-    SerialParserAdapter(SerialParserAdapter&&) = default;
-    SerialParserAdapter& operator=(SerialParserAdapter&&) = default;
+    // Disable move
+    SerialParserAdapter(SerialParserAdapter&&) = delete;
+    SerialParserAdapter& operator=(SerialParserAdapter&&) = delete;
 
     // Optional: modify some settings at runtime
     void set_baud_rate(unsigned int baud) {
