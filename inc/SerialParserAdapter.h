@@ -27,9 +27,6 @@ struct SerialConfig {
 
     enum class FlowControl { None, Software, Hardware };
     FlowControl flow_control = FlowControl::None;
-
-    // Optional: extra options when opening serial port
-    bool open_immediately = true;
 };
 
 // -------------------------------------------------
@@ -107,15 +104,6 @@ private:
 
         if (parser_) {
             parser_->reset();
-            parser_->setFrameCallback(
-                [this](const std::string& /*ip*/, const uint8_t* data, size_t len) {
-                    onFrame(data, len);
-                });
-            parser_->setErrorCallback(
-                [](const std::string& /*ip*/, StreamParser::ErrorCode code, const std::string& detail) {
-                    std::cerr << "[ParseError] code=" << static_cast<int>(code)
-                              << " detail=" << detail << std::endl;
-                });
         }
 
         start_read();
@@ -188,12 +176,6 @@ private:
                 start_timeout_timer();
             }
         });
-    }
-
-    void onFrame(const uint8_t* data, size_t len) {
-        // Business layer processes complete frames
-        std::cout << "Received complete frame, length: " << len << std::endl;
-        // Can push frame to business queue or process directly here
     }
 
     asio::serial_port             port_;

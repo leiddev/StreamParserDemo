@@ -25,6 +25,18 @@ int main(int argc, char* argv[]) {
         // 2. Create specific protocol parser
         auto parser = std::make_unique<A55A55AAParser>(port_name, 300, 2048);
 
+        parser->setFrameCallback(
+            [](const std::string& tag, const uint8_t* data, size_t len) {
+                std::cout << "[" << tag << "] Received complete frame, length: " << len << std::endl;
+                // Can push frame to business queue or process directly here
+            });
+
+        parser->setErrorCallback(
+            [](const std::string& tag, StreamParser::ErrorCode code, const std::string& detail) {
+                std::cerr << "[" << tag << "] [ParseError] code=" << static_cast<int>(code)
+                    << " detail=" << detail << std::endl;
+            });
+
         // 3. Inject configuration + parser
         SerialParserAdapter adapter(io, port_name, config, std::move(parser));
 

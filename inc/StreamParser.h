@@ -47,7 +47,14 @@ public:
     // Called periodically by external timer (recommended 20~50ms)
     void checkTimeout();
 
-    // Call when connection is disconnected or needs forced cleanup
+    // Call when connection is disconnected or needs forced cleanup.
+    //
+    // CONTRACT: reset() only clears protocol-internal state — buffered bytes,
+    // state machine position, timeouts, etc. It MUST NOT touch the callbacks
+    // previously installed via setFrameCallback() / setErrorCallback(); those
+    // remain bound to the lifetime of the StreamParser object so that business
+    // code can register them once and have them survive adapter close()/open()
+    // cycles.
     void reset();
 
     const std::string& tag() const { return m_tag; }
