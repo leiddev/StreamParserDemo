@@ -44,19 +44,7 @@ int main(int argc, char* argv[]) {
         // 3. Inject configuration + parser into adapter
         SerialParserAdapter adapter(io, port_name, config, std::move(parser));
 
-        // 4. Test Case 1: async_write with callback
-        std::vector<uint8_t> data = { 0x01, 0x02, 0x03 };
-        adapter.async_write(
-            std::make_shared<std::vector<uint8_t>>(std::move(data)),
-            [](WriteResult r, size_t n,
-               const asio::error_code& ec, const std::string& detail) {
-                if (r == WriteResult::Ok) {
-                    std::cout << "[async_write] sent " << n << " bytes" << std::endl;
-                } else {
-                    std::cerr << "[async_write] failed: " << detail << std::endl;
-                }
-            });
-
+        // 4. Test Case: build_and_async_write with callback
         adapter.build_and_async_write({ 0xAA, 0xBB, 0xCC },
             [](WriteResult r, size_t n,
                const asio::error_code& ec, const std::string& detail) {
