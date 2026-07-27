@@ -1,4 +1,6 @@
 #include <string>
+#include <thread>
+#include <chrono>
 #include "A55A55AAParser.h"
 #include "SerialParserAdapter.h"
 
@@ -7,7 +9,11 @@ int main(int argc, char* argv[]) {
     asio::io_context io;
 
     // 1. Configure serial port parameters
+#ifdef _WIN32
     std::string port_name = "COM1";  // Change to your serial port
+#else
+    std::string port_name = "/dev/ttyS1";  // Change to your serial port
+#endif
     SerialConfig config;
     config.baud_rate      = 115200;
     config.character_size = 8;
@@ -25,6 +31,14 @@ int main(int argc, char* argv[]) {
         // To switch protocol, just change this line:
         // auto parser = std::make_unique<ModbusRtuParser>("COM3", 500, 4096);
         // SerialParserAdapter adapter(io, "COM3", config, std::move(parser));
+
+#ifdef __linux
+        // Verify close/reopen behavior on Linux only:
+        // On Windows COM ports the OS retains the handle briefly after
+        // close(), causing immediate reopen to fail with access_denied.
+        adapter.close();
+        adapter.open();
+#endif
 
         io.run();
     } catch (const std::exception& e) {

@@ -50,27 +50,10 @@ public:
         : port_(io)
         , timer_(io)
         , parser_(std::move(parser))
+        , port_name_(port_name)
+        , config_(config)
     {
-        // Open serial port
-        port_.open(port_name);
-
-        // Apply configuration
-        apply_config(config);
-
-        // Register parser callbacks (depends only on base class interface)
-        parser_->setFrameCallback(
-            [this](const std::string& /*ip*/, const uint8_t* data, size_t len) {
-                onFrame(data, len);
-            });
-
-        parser_->setErrorCallback(
-            [](const std::string& /*ip*/, StreamParser::ErrorCode code, const std::string& detail) {
-                std::cerr << "[ParseError] code=" << static_cast<int>(code)
-                          << " detail=" << detail << std::endl;
-            });
-
-        start_read();
-        start_timeout_timer();
+        do_open();
     }
 
     // Disable copy
@@ -86,6 +69,10 @@ public:
         port_.set_option(asio::serial_port_base::baud_rate(baud));
     }
 
+    void open() {
+        do_open();
+    }
+
     void close() noexcept {
         if (!port_.is_open())
             return;
@@ -93,8 +80,9 @@ public:
         closing_ = true;
 
         asio::error_code ec;
-        port_.close(ec);
         timer_.cancel(ec);
+        port_.cancel(ec);
+        port_.close(ec);
 
         if (parser_) {
             parser_->reset();
@@ -106,6 +94,34 @@ public:
     }
 
 private:
+    void do_open() {
+        if (port_.is_open()) {
+            asio::error_code ec;
+            port_.cancel(ec);
+            port_.close(ec);
+        }
+
+        port_.open(port_name_);
+        apply_config(config_);
+        closing_ = false;
+
+        if (parser_) {
+            parser_->reset();
+            parser_->setFrameCallback(
+                [this](const std::string& /*ip*/, const uint8_t* data, size_t len) {
+                    onFrame(data, len);
+                });
+            parser_->setErrorCallback(
+                [](const std::string& /*ip*/, StreamParser::ErrorCode code, const std::string& detail) {
+                    std::cerr << "[ParseError] code=" << static_cast<int>(code)
+                              << " detail=" << detail << std::endl;
+                });
+        }
+
+        start_read();
+        start_timeout_timer();
+    }
+
     void apply_config(const SerialConfig& cfg) {
         using spb = asio::serial_port_base;   // Alias for brevity
 
@@ -185,6 +201,8 @@ private:
     std::unique_ptr<StreamParser> parser_;   // Only holds base class
     std::array<uint8_t, 512>      buf_;
     bool                          closing_ = false;
+    std::string                   port_name_;
+    SerialConfig                  config_;
 };
 
 #endif  // !_SERIAL_PARSER_ADAPTER_H_
