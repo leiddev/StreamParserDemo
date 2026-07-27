@@ -41,7 +41,7 @@ public:
      * @param parser      Pre-constructed parser (ownership transferred, depends only on base class)
      */
     SerialParserAdapter(asio::io_context& io,
-                        const std::string port_name,
+                        const std::string& port_name,
                         const SerialConfig config,
                         std::unique_ptr<StreamParser> parser)
         : port_(io)
