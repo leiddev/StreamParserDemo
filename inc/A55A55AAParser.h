@@ -169,7 +169,7 @@ protected:
                         reset();
                         break;
                     }
-                    completeFrame();         // Success -> callback + auto reset
+                    completeFrame(4, m_expected_len - 3);         // Success -> callback + auto reset
                 } else {
                     std::string detail = "invalid tail: expected 0x55 0xAA, got 0x" +
                         toHex(m_buf[tail_pos]) + " 0x" + toHex(m_buf[tail_pos + 1]);

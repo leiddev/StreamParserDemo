@@ -74,6 +74,7 @@ protected:
 
     // ========== Helper functions for derived class ==========
     void completeFrame();                           // Notify upper layer of frame completion, reset state
+    void completeFrame(size_t offset, size_t size); // Notify upper layer of frame completion with offset and size, reset state
     void reportError(ErrorCode code, const std::string& detail = "");
     void updateActivity();                          // Update timestamp when new data arrives
     bool isTimeout() const;                         // Check if currently in timeout state

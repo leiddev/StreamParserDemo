@@ -69,6 +69,22 @@ void StreamParser::completeFrame() {
     m_in_frame = false;
 }
 
+void StreamParser::completeFrame(size_t offset, size_t size) {
+    if (m_frame_cb && !m_buf.empty()) {
+        if (offset + size > m_buf.size()) {
+            reportError(ErrorCode::BufferOverflow, "completeFrame offset+size exceeds buffer");
+            reset();
+            return;
+        }
+        m_frame_cb(m_tag, m_buf.data() + offset, size);
+    }
+    // Auto return to idle after completion, continue processing subsequent sticky packets
+    m_buf.clear();
+    m_state = 0;
+    m_expected_len = 0;
+    m_in_frame = false;
+}
+
 void StreamParser::reportError(ErrorCode code, const std::string& detail) {
     if (m_error_cb) {
         m_error_cb(m_tag, code, detail);
