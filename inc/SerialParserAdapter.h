@@ -42,7 +42,7 @@ public:
      */
     SerialParserAdapter(asio::io_context& io,
                         const std::string& port_name,
-                        const SerialConfig config,
+                        const SerialConfig& config,
                         std::unique_ptr<StreamParser> parser)
         : port_(io)
         , timer_(io)
