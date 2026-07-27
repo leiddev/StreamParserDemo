@@ -11,6 +11,9 @@
 #include <iostream>
 #include <chrono>
 #include <string>
+#include <vector>
+#include <functional>
+#include "StreamParser.h"
 
 // -------------------------------------------------
 // 1. Serial port configuration struct
@@ -28,6 +31,31 @@ struct SerialConfig {
     enum class FlowControl { None, Software, Hardware };
     FlowControl flow_control = FlowControl::None;
 };
+
+// -------------------------------------------------
+// 2. Write result enum (business-layer friendly, no asio dependency)
+// -------------------------------------------------
+enum class WriteResult {
+    Ok,          // Atomic frame transmitted successfully
+    PortClosed,  // Serial port not open or already closed
+    Cancelled,   // Operation aborted (close() called or adapter destroyed)
+    IOError,     // Low-level I/O error (see detail)
+    InvalidArg,  // Invalid argument (null or empty frame)
+};
+
+// -------------------------------------------------
+// 3. Write completion callback
+// -------------------------------------------------
+// @param result   Write outcome, business-layer facing
+// @param bytes    Actual bytes transmitted; on Ok == frame.size(),
+//                 on failure == 0 (frame is atomic)
+// @param ec       Raw asio error code; valid only within this callback.
+//                 Do not capture or hold it asynchronously.
+// @param detail   Human-readable error description; non-empty on failure
+using WriteCallback = std::function<void(WriteResult result,
+                                          size_t      bytes,
+                                          const asio::error_code& ec,
+                                          const std::string&      detail)>;
 
 // -------------------------------------------------
 // 2. SerialParserAdapter (depends only on base class StreamParser)
@@ -88,6 +116,52 @@ public:
 
     ~SerialParserAdapter() {
         close();
+    }
+
+    // -------------------------------------------------
+    // 4. Async atomic write
+    // -------------------------------------------------
+    // Atomically writes an entire protocol frame to the serial port.
+    // Uses asio::async_write so the complete frame is sent without interleaving.
+    //
+    // Thread model: serial_port is not thread-safe; this function may be called
+    // from any thread. Internally asio::post() forwards execution to the
+    // io_context thread, so the calling thread never blocks.
+    //
+    // Buffer lifetime: frame is captured by shared_ptr in the lambda, so the
+    // buffer stays alive until the callback fires. The caller only needs to
+    // ensure frame is valid at call time.
+    //
+    // Atomic guarantee: asio::async_write sends the entire buffer before any
+    // other write operation can interleave. Partial failure is not possible;
+    // bytes is either frame->size() on success or 0 on failure.
+    //
+    // Cancellation: close() or adapter destruction causes all pending writes
+    // to receive WriteResult::Cancelled.
+    //
+    // @param frame  Complete protocol frame (usually built by StreamParser::buildFrame).
+    //               Must be non-null and non-empty.
+    // @param cb     Completion callback; may be nullptr to fire-and-forget.
+    void async_write(std::shared_ptr<const std::vector<uint8_t>> frame,
+        WriteCallback cb = nullptr) {
+        asio::post(port_.get_executor(),
+            [self = this, frame = std::move(frame), cb = std::move(cb)]() mutable {
+                self->do_async_write(std::move(frame), std::move(cb));
+            });
+    }
+
+    // Encode payload and send asynchronously.
+    // Internally calls parser_->buildFrame(payload). If build succeeds (non-empty frame),
+    // posts async_write to the io_context executor. If build fails (empty frame), the
+    // callback is NOT invoked and no data is sent.
+    void build_and_async_write(const std::vector<uint8_t>& payload, WriteCallback cb = nullptr) {
+        if (parser_) {
+            auto frame = parser_->buildFrame(payload);
+            if (!frame.empty()) {
+                auto frame_ptr = std::make_shared<std::vector<uint8_t>>(std::move(frame));
+                async_write(frame_ptr, std::move(cb));
+            }
+        }
     }
 
 private:
@@ -176,6 +250,35 @@ private:
                 start_timeout_timer();
             }
         });
+    }
+
+    // Translate asio::error_code to WriteResult + human-readable detail.
+    static WriteResult map_ec(const asio::error_code& ec, std::string& detail) {
+        if (!ec) return WriteResult::Ok;
+        detail = ec.message();
+        if (ec == asio::error::operation_aborted) return WriteResult::Cancelled;
+        if (ec == asio::error::bad_descriptor)     return WriteResult::PortClosed;
+        return WriteResult::IOError;
+    }
+
+    // Core atomic write: must be called from io_context thread.
+    void do_async_write(std::shared_ptr<const std::vector<uint8_t>> frame,
+                        WriteCallback cb) {
+        if (!port_.is_open()) {
+            if (cb) cb(WriteResult::PortClosed, 0, {}, "serial port not open");
+            return;
+        }
+        if (!frame || frame->empty()) {
+            if (cb) cb(WriteResult::InvalidArg, 0, {}, "empty frame");
+            return;
+        }
+
+        asio::async_write(port_, asio::buffer(*frame),
+            [frame, cb](const asio::error_code& ec, size_t n) {
+                std::string detail;
+                auto r = map_ec(ec, detail);
+                if (cb) cb(r, n, ec, std::move(detail));
+            });
     }
 
     asio::serial_port             port_;

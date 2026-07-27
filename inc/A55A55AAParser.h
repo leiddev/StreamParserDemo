@@ -35,6 +35,46 @@ public:
         : StreamParser(tag, timeout_ms, max_frame)
     {}
 
+    // Returns empty vector on failure; non-empty frame on success.
+    std::vector<uint8_t> buildFrame(const std::vector<uint8_t>& payload) override
+    {
+        // Protocol format:
+        //   [0xA5 0x5A]  [LenHi LenLo]  [payload...]  [0x55 0xAA]
+        //   2 bytes      2 bytes        N bytes        2 bytes
+        // LenHi LenLo = payload.size() + 2 (trailer occupies 2 bytes)
+
+        uint16_t trailer_len = 2;
+
+        // payload.size() + trailer_len must fit in uint16_t (max 0xFFFF).
+        // Check before the static_cast to avoid silent truncation.
+        if (payload.size() > 0xFFFF - trailer_len) {
+            std::string detail = "build payload length too large: " + std::to_string(payload.size());
+            reportError(ErrorCode::ProtocolError, detail);
+            return {};
+        }
+
+        uint16_t L = static_cast<uint16_t>(payload.size()) + trailer_len;
+        size_t total_len = 4 + L;  // 2 header + 2 len + payload + 2 trailer
+        if (total_len > m_max_frame_size) {
+            std::string detail = "build frame length too large: " + std::to_string(total_len);
+            reportError(ErrorCode::ProtocolError, detail);
+            return {};
+        }
+
+        std::vector<uint8_t> frame;
+        frame.reserve(total_len);
+
+        frame.push_back(0xA5);
+        frame.push_back(0x5A);
+        frame.push_back(static_cast<uint8_t>((L >> 8) & 0xFF));
+        frame.push_back(static_cast<uint8_t>(L & 0xFF));
+        frame.insert(frame.end(), payload.begin(), payload.end());
+        frame.push_back(0x55);
+        frame.push_back(0xAA);
+
+        return frame;
+    }
+
 protected:
     void processByte(uint8_t byte) override {
         switch (m_state) {

@@ -59,6 +59,13 @@ public:
 
     const std::string& tag() const { return m_tag; }
 
+    // Encode a payload into a complete protocol frame.
+    // Inverse operation of processByte(): feed() decodes inbound bytes,
+    // buildFrame() encodes an outbound payload into a transmittable byte stream.
+    // Return non-empty frame on success; empty vector on protocol-level failure
+    // (e.g. payload too large). Empty means the frame is invalid, do not send.
+    virtual std::vector<uint8_t> buildFrame(const std::vector<uint8_t>& payload) = 0;
+
 protected:
     // ========== Must be implemented by derived class ==========
     // Called once per received byte. Derived class maintains its own state machine here.

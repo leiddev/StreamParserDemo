@@ -1,6 +1,10 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <iostream>
+#include <iomanip>
+#include <vector>
+#include <memory>
 #include "A55A55AAParser.h"
 #include "SerialParserAdapter.h"
 
@@ -37,12 +41,31 @@ int main(int argc, char* argv[]) {
                     << " detail=" << detail << std::endl;
             });
 
-        // 3. Inject configuration + parser
+        // 3. Inject configuration + parser into adapter
         SerialParserAdapter adapter(io, port_name, config, std::move(parser));
 
-        // To switch protocol, just change this line:
-        // auto parser = std::make_unique<ModbusRtuParser>("COM3", 500, 4096);
-        // SerialParserAdapter adapter(io, "COM3", config, std::move(parser));
+        // 4. Test Case 1: async_write with callback
+        std::vector<uint8_t> data = { 0x01, 0x02, 0x03 };
+        adapter.async_write(
+            std::make_shared<std::vector<uint8_t>>(std::move(data)),
+            [](WriteResult r, size_t n,
+               const asio::error_code& ec, const std::string& detail) {
+                if (r == WriteResult::Ok) {
+                    std::cout << "[async_write] sent " << n << " bytes" << std::endl;
+                } else {
+                    std::cerr << "[async_write] failed: " << detail << std::endl;
+                }
+            });
+
+        adapter.build_and_async_write({ 0xAA, 0xBB, 0xCC },
+            [](WriteResult r, size_t n,
+               const asio::error_code& ec, const std::string& detail) {
+                if (r == WriteResult::Ok) {
+                    std::cout << "[build_and_async_write] sent " << n << " bytes" << std::endl;
+                } else {
+                    std::cerr << "[build_and_async_write] failed: " << detail << std::endl;
+                }
+            });
 
 #ifdef __linux
         // Verify close/reopen behavior on Linux only:
