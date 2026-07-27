@@ -10,12 +10,13 @@
  * | Field      | Length | Description |
  * |------------|--------|-------------|
  * | Frame Head | 2      | Fixed 0xA5 0x5A |
- * | Frame Len  | 2      | Big-endian, value is length of "payload + trailer" |
+ * | Frame Len  | 2      | Big-endian, value is length of "payload + checksum + trailer" |
  * | Payload    | N      | Variable length |
+ * | Checksum   | 1      | Checksum of header + len + payload |
  * | Trailer    | 2      | Fixed 0x55 0xAA |
  * 
  * Therefore:
- * - Length field value L >= 2
+ * - Length field value L >= 3 (1 checksum + 2 trailer)
  * - Total frame length = 4 + L
  * - After receiving, must verify last two bytes are 0x55 0xAA
 */
@@ -39,22 +40,22 @@ public:
     std::vector<uint8_t> buildFrame(const std::vector<uint8_t>& payload) override
     {
         // Protocol format:
-        //   [0xA5 0x5A]  [LenHi LenLo]  [payload...]  [0x55 0xAA]
-        //   2 bytes      2 bytes        N bytes        2 bytes
-        // LenHi LenLo = payload.size() + 2 (trailer occupies 2 bytes)
+        //   [0xA5 0x5A]  [LenHi LenLo]  [payload...]  [checksum]  [0x55 0xAA]
+        //   2 bytes      2 bytes        N bytes        1 bytes     2 bytes
+        // LenHi LenLo = payload.size() + 1 (checksum) + 2 (trailer occupies 2 bytes)
 
-        uint16_t trailer_len = 2;
+        uint16_t checksum_trailer_len = 1 + 2;
 
         // payload.size() + trailer_len must fit in uint16_t (max 0xFFFF).
         // Check before the static_cast to avoid silent truncation.
-        if (payload.size() > 0xFFFF - trailer_len) {
+        if (payload.size() > 0xFFFF - checksum_trailer_len) {
             std::string detail = "build payload length too large: " + std::to_string(payload.size());
             reportError(ErrorCode::ProtocolError, detail);
             return {};
         }
 
-        uint16_t L = static_cast<uint16_t>(payload.size()) + trailer_len;
-        size_t total_len = 4 + L;  // 2 header + 2 len + payload + 2 trailer
+        uint16_t L = static_cast<uint16_t>(payload.size()) + checksum_trailer_len;
+        size_t total_len = 4 + L;  // 2 header + 2 len + payload + 3 trailer
         if (total_len > m_max_frame_size) {
             std::string detail = "build frame length too large: " + std::to_string(total_len);
             reportError(ErrorCode::ProtocolError, detail);
@@ -69,6 +70,8 @@ public:
         frame.push_back(static_cast<uint8_t>((L >> 8) & 0xFF));
         frame.push_back(static_cast<uint8_t>(L & 0xFF));
         frame.insert(frame.end(), payload.begin(), payload.end());
+        uint8_t check_sum = getChecksum(frame.data(), total_len - 3);
+        frame.push_back(check_sum);
         frame.push_back(0x55);
         frame.push_back(0xAA);
 
@@ -129,8 +132,8 @@ protected:
                           static_cast<uint16_t>(m_buf[3]);
 
             // Validation check
-            if (L < 2) {                    // At least 2 bytes for trailer required
-                reportError(ErrorCode::ProtocolError, "length field < 2");
+            if (L < 3) {                    // At least 1 byte for checksum + 2 bytes for trailer required
+                reportError(ErrorCode::ProtocolError, "length field < 3");
                 reset();
                 break;
             }
@@ -157,6 +160,15 @@ protected:
                 // Verify trailer
                 size_t tail_pos = m_buf.size() - 2;
                 if (m_buf[tail_pos] == 0x55 && m_buf[tail_pos + 1] == 0xAA) {
+                    uint8_t check_sum = getChecksum(m_buf.data(), m_buf.size() - 3);
+                    if (check_sum != m_buf[m_buf.size() - 3]) {
+                        std::string detail = "checksum mismatch: expected 0x" +
+                            toHex(check_sum) + ", got 0x" +
+                            toHex(m_buf[m_buf.size() - 3]);
+                        reportError(ErrorCode::ChecksumFail, detail);
+                        reset();
+                        break;
+                    }
                     completeFrame();         // Success -> callback + auto reset
                 } else {
                     std::string detail = "invalid tail: expected 0x55 0xAA, got 0x" +
@@ -169,6 +181,8 @@ protected:
                         m_state = 1;
                     }
                 }
+            } else {
+                // Still receiving payload + trailer, stay in state 4
             }
             break;
 
@@ -177,6 +191,14 @@ protected:
             reset();
             break;
         }
+    }
+
+    static char getChecksum(const uint8_t* data, size_t len) {
+        char checksum = 0;
+        for (size_t i = 0; i < len; i++) {
+            checksum ^= *data++;
+        }
+        return checksum;
     }
 };
 
