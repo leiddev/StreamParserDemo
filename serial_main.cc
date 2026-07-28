@@ -9,6 +9,8 @@
 #include "A55A55AAParser.h"
 #include "SerialParserAdapter.h"
 
+// Global adapter pointer
+std::unique_ptr<SerialParserAdapter> g_adapter;
 
 int main(int argc, char* argv[]) {
     std::cout << "=== Serial Stream Parser Demo ===" << std::endl;
@@ -38,6 +40,8 @@ int main(int argc, char* argv[]) {
                 std::printf("%02X ", data[i]);
             }
             std::cout << std::endl;
+            std::vector<uint8_t> response(data, data + len);
+            g_adapter->build_and_async_write(response);
             // Can push frame to business queue or process directly here
         });
 
@@ -50,10 +54,10 @@ int main(int argc, char* argv[]) {
 
     try {
         // 3. Inject configuration + parser into adapter
-        SerialParserAdapter adapter(io, port_name, config, std::move(parser));
+        g_adapter = std::make_unique<SerialParserAdapter>(io, port_name, config, std::move(parser));
 
         // 4. Test Case: build_and_async_write with callback
-        adapter.build_and_async_write({ 0xAA, 0xBB, 0xCC },
+        g_adapter->build_and_async_write({ 0xAA, 0xBB, 0xCC },
             [](WriteResult r, size_t n,
                 const asio::error_code& ec, const std::string& detail) {
                 if (r == WriteResult::Ok) {
@@ -67,8 +71,8 @@ int main(int argc, char* argv[]) {
         // Verify close/reopen behavior on Linux only:
         // On Windows COM ports the OS retains the handle briefly after
         // close(), causing immediate reopen to fail with access_denied.
-        adapter.close();
-        adapter.open();
+        g_adapter->close();
+        g_adapter->open();
 #endif
 
         io.run();
