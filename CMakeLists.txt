@@ -8,7 +8,7 @@ include(ExternalProject)
 # Include External Project
 include(3rdparty/asio.cmake)
 
-add_executable(StreamParserDemo main.cc)
+add_executable(SerialDemo serial_main.cc)
 add_executable(TcpServerDemo tcp_server_main.cc)
 
 if(WIN32)
@@ -25,7 +25,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
     add_compile_options(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
 endif()
 
-target_sources(StreamParserDemo PRIVATE
+target_sources(SerialDemo PRIVATE
     src/StreamParser.cc
 )
 
@@ -33,9 +33,9 @@ target_sources(TcpServerDemo PRIVATE
     src/StreamParser.cc
 )
 
-target_include_directories(StreamParserDemo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
-target_link_libraries(StreamParserDemo asio)
-target_compile_definitions(StreamParserDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
+target_include_directories(SerialDemo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+target_link_libraries(SerialDemo asio)
+target_compile_definitions(SerialDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
 
 target_include_directories(TcpServerDemo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 target_link_libraries(TcpServerDemo asio)
