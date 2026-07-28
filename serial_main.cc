@@ -28,34 +28,34 @@ int main(int argc, char* argv[]) {
     config.stop_bits      = SerialConfig::StopBits::One;
     config.flow_control   = SerialConfig::FlowControl::None;
 
+    // 2. Create specific protocol parser
+    auto parser = std::make_unique<A55A55AAParser>(port_name, 300, 2048);
+
+    parser->setFrameCallback(
+        [](const std::string& tag, const uint8_t* data, size_t len) {
+            std::cout << "[Frame] tag=" << tag << " len=" << len << " data=";
+            for (size_t i = 0; i < len; ++i) {
+                std::printf("%02X ", data[i]);
+            }
+            std::cout << std::endl;
+            // Can push frame to business queue or process directly here
+        });
+
+    parser->setErrorCallback(
+        [](const std::string& tag, StreamParser::ErrorCode code, const std::string& detail) {
+            std::cerr << "[Error] tag=" << tag
+                << " code=" << static_cast<int>(code)
+                << " detail=" << detail << std::endl;
+        });
+
     try {
-        // 2. Create specific protocol parser
-        auto parser = std::make_unique<A55A55AAParser>(port_name, 300, 2048);
-
-        parser->setFrameCallback(
-            [](const std::string& tag, const uint8_t* data, size_t len) {
-                std::cout << "[Frame] tag=" << tag << " len=" << len << " data=";
-                for (size_t i = 0; i < len; ++i) {
-                    std::printf("%02X ", data[i]);
-                }
-                std::cout << std::endl;
-                // Can push frame to business queue or process directly here
-            });
-
-        parser->setErrorCallback(
-            [](const std::string& tag, StreamParser::ErrorCode code, const std::string& detail) {
-                std::cerr << "[Error] tag=" << tag
-                    << " code=" << static_cast<int>(code)
-                    << " detail=" << detail << std::endl;
-            });
-
         // 3. Inject configuration + parser into adapter
         SerialParserAdapter adapter(io, port_name, config, std::move(parser));
 
         // 4. Test Case: build_and_async_write with callback
         adapter.build_and_async_write({ 0xAA, 0xBB, 0xCC },
             [](WriteResult r, size_t n,
-               const asio::error_code& ec, const std::string& detail) {
+                const asio::error_code& ec, const std::string& detail) {
                 if (r == WriteResult::Ok) {
                     std::cout << "[build_and_async_write] sent " << n << " bytes" << std::endl;
                 } else {
