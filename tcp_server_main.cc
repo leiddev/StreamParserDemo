@@ -1,0 +1,95 @@
+/*
+ * Leid 2026.7
+ * TCP server demo using TcpServer + TcpSessionParserAdapter
+ */
+#include <iostream>
+#include <memory>
+#include <unordered_map>
+#include <mutex>
+#include <cstdio>
+#include <asio.hpp>
+#include "TcpServer.h"
+#include "TcpSessionParserAdapter.h"
+#include "A55A55AAParser.h"
+
+static std::unordered_map<std::string, std::weak_ptr<TcpSessionParserAdapter>> g_sessions;
+static std::mutex g_sessions_mutex;
+
+static void onDisconnect(const std::string& tag) {
+    std::cout << "[Disconnect] " << tag << std::endl;
+    std::lock_guard<std::mutex> lock(g_sessions_mutex);
+    g_sessions.erase(tag);
+}
+
+int main() {
+    std::cout << "=== TCP Stream Parser Demo ===" << std::endl;
+
+    asio::io_context io;
+
+    auto session_factory = [&](asio::ip::tcp::socket socket) -> std::shared_ptr<TcpSessionParserAdapter> {
+        auto remote_ep = socket.remote_endpoint();
+        std::string tag = remote_ep.address().to_string() + ":" +
+                          std::to_string(remote_ep.port());
+
+        std::cout << "[Accept] " << tag << std::endl;
+
+        auto parser = std::make_unique<A55A55AAParser>(tag, 300, 2048);
+
+        parser->setFrameCallback(
+            [](const std::string& tag, const uint8_t* data, size_t len) {
+                std::cout << "[Frame] tag=" << tag << " len=" << len << " data=";
+                for (size_t i = 0; i < len; ++i) {
+                    std::printf("%02X ", data[i]);
+                }
+                std::cout << std::endl;
+                auto sp = g_sessions[tag].lock();
+                if (sp) {
+                    std::vector<uint8_t> response(data, data + len);
+                    sp->build_and_async_write(response);
+                }
+            });
+
+        parser->setErrorCallback(
+            [](const std::string& tag,
+               StreamParser::ErrorCode code,
+               const std::string& detail) {
+                std::cerr << "[Error] tag=" << tag
+                          << " code=" << static_cast<int>(code)
+                          << " detail=" << detail << std::endl;
+            });
+
+        auto adapter = std::make_shared<TcpSessionParserAdapter>(
+            io, std::move(socket), tag, std::move(parser));
+
+        adapter->setDisconnectCallback(onDisconnect);
+        adapter->build_and_async_write({ 0x01, 0x02, 0x03 });
+
+        {
+            std::lock_guard<std::mutex> lock(g_sessions_mutex);
+            g_sessions[tag] = adapter;
+        }
+
+        return adapter;
+    };
+
+    TcpConfig config;
+    config.bind_address = "0.0.0.0";
+    config.port = 9000;
+    config.backlog = 16;
+
+    TcpServer server(io, config, session_factory);
+    server.listen();
+
+    std::cout << "Server started on 0.0.0.0:9000. Press Ctrl+C to stop." << std::endl;
+    
+    try {
+        io.run();
+    } catch (const std::exception& e) {
+        std::cerr << "io_context exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "io_context unknown exception" << std::endl;
+    }
+
+    std::cout << "Server exited." << std::endl;
+    return 0;
+}

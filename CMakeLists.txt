@@ -9,6 +9,7 @@ include(ExternalProject)
 include(3rdparty/asio.cmake)
 
 add_executable(StreamParserDemo main.cc)
+add_executable(TcpServerDemo tcp_server_main.cc)
 
 if(WIN32)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
@@ -28,9 +29,17 @@ target_sources(StreamParserDemo PRIVATE
     src/StreamParser.cc
 )
 
+target_sources(TcpServerDemo PRIVATE
+    src/StreamParser.cc
+)
+
 target_include_directories(StreamParserDemo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 target_link_libraries(StreamParserDemo asio)
 target_compile_definitions(StreamParserDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
+
+target_include_directories(TcpServerDemo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+target_link_libraries(TcpServerDemo asio)
+target_compile_definitions(TcpServerDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
 
 
 message(STATUS "Build completed for ${CMAKE_SYSTEM_NAME}")
