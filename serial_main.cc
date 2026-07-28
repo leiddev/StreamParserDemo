@@ -5,11 +5,14 @@
 #include <iomanip>
 #include <vector>
 #include <memory>
+#include <cstdio>
 #include "A55A55AAParser.h"
 #include "SerialParserAdapter.h"
 
 
 int main(int argc, char* argv[]) {
+    std::cout << "=== Serial Stream Parser Demo ===" << std::endl;
+
     asio::io_context io;
 
     // 1. Configure serial port parameters
@@ -31,13 +34,18 @@ int main(int argc, char* argv[]) {
 
         parser->setFrameCallback(
             [](const std::string& tag, const uint8_t* data, size_t len) {
-                std::cout << "[" << tag << "] Received complete frame, length: " << len << std::endl;
+                std::cout << "[Frame] tag=" << tag << " len=" << len << " data=";
+                for (size_t i = 0; i < len; ++i) {
+                    std::printf("%02X ", data[i]);
+                }
+                std::cout << std::endl;
                 // Can push frame to business queue or process directly here
             });
 
         parser->setErrorCallback(
             [](const std::string& tag, StreamParser::ErrorCode code, const std::string& detail) {
-                std::cerr << "[" << tag << "] [ParseError] code=" << static_cast<int>(code)
+                std::cerr << "[Error] tag=" << tag
+                    << " code=" << static_cast<int>(code)
                     << " detail=" << detail << std::endl;
             });
 
@@ -65,7 +73,11 @@ int main(int argc, char* argv[]) {
 
         io.run();
     } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        std::cerr << "io_context exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "io_context unknown exception" << std::endl;
     }
+
+    std::cout << "Demo exited." << std::endl;
     return 0;
 }
