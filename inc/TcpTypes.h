@@ -51,6 +51,12 @@ struct TcpAdapterConfig {
     uint32_t timer_period_ms     = 30;    // Frame timeout check period (recommended 20~50ms)
     size_t   recv_buffer_bytes  = 4096;  // async_read_some buffer size
     bool     graceful_shutdown  = true;  // Call shutdown() before close()
+
+    // Keepalive configuration (detects silent disconnects)
+    bool     enable_keepalive           = false;  // Enable TCP keepalive
+    int      keepalive_idle_seconds     = 30;     // Time before first probe
+    int      keepalive_interval_seconds = 5;      // Interval between probes
+    int      keepalive_probes           = 3;     // Number of probes before declaring dead
 };
 
 // -------------------------------------------------

@@ -58,8 +58,14 @@ int main() {
                           << " detail=" << detail << std::endl;
             });
 
+        TcpAdapterConfig adapter_config;
+        adapter_config.enable_keepalive = true;
+        adapter_config.keepalive_idle_seconds = 30;
+        adapter_config.keepalive_interval_seconds = 5;
+        adapter_config.keepalive_probes = 3;
+
         auto adapter = std::make_shared<TcpSessionParserAdapter>(
-            io, std::move(socket), tag, std::move(parser));
+            io, std::move(socket), tag, std::move(parser), adapter_config);
 
         adapter->setDisconnectCallback(onDisconnect);
         adapter->build_and_async_write({ 0x01, 0x02, 0x03 });

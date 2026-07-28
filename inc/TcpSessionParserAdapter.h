@@ -14,6 +14,18 @@
 #include "TcpTypes.h"
 #include "StreamParser.h"
 
+#ifdef __linux__
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
+#include <winsock2.h>
+#include <mswsock.h>
+#include <mstcpip.h>
+#endif
+
 // -------------------------------------------------
 // TcpSessionParserAdapter
 //
@@ -165,8 +177,44 @@ private:
         if (parser_) {
             parser_->reset();
         }
+        enable_keepalive();
         start_read();
         start_timeout_timer();
+    }
+
+    // -------------------------------------------------
+    // 5. Keepalive
+    // -------------------------------------------------
+    void enable_keepalive() {
+        if (!config_.enable_keepalive) return;
+
+        asio::socket_base::keep_alive option(true);
+        socket_.set_option(option);
+
+#ifdef __linux__
+        int fd = socket_.native_handle();
+        int val = config_.keepalive_idle_seconds;
+        ::setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &val, sizeof(val));
+        val = config_.keepalive_interval_seconds;
+        ::setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &val, sizeof(val));
+        val = config_.keepalive_probes;
+        ::setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &val, sizeof(val));
+#endif
+
+#ifdef _WIN32
+        struct tcp_keepalive {
+            ULONG onoff;
+            ULONG keepalivetime;
+            ULONG keepaliveinterval;
+        } k = {
+            1,
+            static_cast<ULONG>(config_.keepalive_idle_seconds * 1000),
+            static_cast<ULONG>(config_.keepalive_interval_seconds * 1000)
+        };
+        DWORD bytes = 0;
+        ::WSAIoctl(socket_.native_handle(), SIO_KEEPALIVE_VALS,
+                   &k, sizeof(k), nullptr, 0, &bytes, nullptr, nullptr);
+#endif
     }
 
     // -------------------------------------------------
