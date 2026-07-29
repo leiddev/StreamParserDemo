@@ -1,6 +1,10 @@
 /*
  * Leid 2026.7
+ *
  * TCP server demo using TcpServer + TcpSessionParserAdapter
+ *
+ * Default port: 9000 (override via command line argument)
+ * Default bind address: 0.0.0.0 (accept connections on all interfaces)
  */
 #include <iostream>
 #include <memory>
@@ -21,8 +25,11 @@ static void onDisconnect(const std::string& tag) {
     g_sessions.erase(tag);
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     std::cout << "=== TCP Stream Parser Demo ===" << std::endl;
+
+    uint16_t port = 9000;
+    if (argc >= 2) port = static_cast<uint16_t>(std::stoi(argv[1]));
 
     asio::io_context io;
 
@@ -80,7 +87,7 @@ int main() {
 
     TcpConfig config;
     config.bind_address = "0.0.0.0";
-    config.port = 9000;
+    config.port = port;
     config.backlog = 16;
 
     TcpServer server(io, config, session_factory);
