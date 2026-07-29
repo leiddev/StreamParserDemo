@@ -1,3 +1,11 @@
+/*
+ * Leid 2026.7
+ *
+ * Serial demo
+ *
+ * Default port_name: COM1 (Windows) or /dev/ttyS1 (Linux)
+ * Default baud_rate: 115200
+ */
 #include <string>
 #include <thread>
 #include <chrono>
@@ -15,16 +23,20 @@ std::unique_ptr<SerialParserAdapter> g_adapter;
 int main(int argc, char* argv[]) {
     std::cout << "=== Serial Stream Parser Demo ===" << std::endl;
 
-    asio::io_context io;
-
-    // 1. Configure serial port parameters
 #ifdef _WIN32
     std::string port_name = "COM1";  // Change to your serial port
 #else
     std::string port_name = "/dev/ttyS1";  // Change to your serial port
 #endif
+    uint32_t    baud_rate = 115200;
+    if (argc >= 2) port_name = argv[1];
+    if (argc >= 3) baud_rate = static_cast<uint32_t>(std::stoi(argv[2]));
+
+    asio::io_context io;
+
+    // 1. Configure serial port parameters
     SerialConfig config;
-    config.baud_rate      = 115200;
+    config.baud_rate      = baud_rate;
     config.character_size = 8;
     config.parity         = SerialConfig::Parity::None;
     config.stop_bits      = SerialConfig::StopBits::One;
@@ -32,6 +44,8 @@ int main(int argc, char* argv[]) {
 
     // 2. Create specific protocol parser
     auto parser = std::make_unique<A55A55AAParser>(port_name, 300, 2048);
+    std::cout << "Serial port: " << port_name << std::endl
+              << "Baud rate: " << baud_rate << std::endl;
 
     parser->setFrameCallback(
         [](const std::string& tag, const uint8_t* data, size_t len) {
