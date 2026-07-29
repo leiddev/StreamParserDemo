@@ -55,7 +55,8 @@ int main(int argc, char* argv[]) {
             }
             std::cout << std::endl;
             std::vector<uint8_t> response(data, data + len);
-            g_adapter->build_and_async_write(response);
+            if (g_adapter)
+                g_adapter->build_and_async_write(response);
             // Can push frame to business queue or process directly here
         });
 
