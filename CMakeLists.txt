@@ -10,6 +10,7 @@ include(3rdparty/asio.cmake)
 
 add_executable(SerialDemo serial_main.cc)
 add_executable(TcpServerDemo tcp_server_main.cc)
+add_executable(TcpClientDemo tcp_client_main.cc)
 
 if(WIN32)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
@@ -33,6 +34,10 @@ target_sources(TcpServerDemo PRIVATE
     src/StreamParser.cc
 )
 
+target_sources(TcpClientDemo PRIVATE
+    src/StreamParser.cc
+)
+
 target_include_directories(SerialDemo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 target_link_libraries(SerialDemo asio)
 target_compile_definitions(SerialDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
@@ -40,6 +45,10 @@ target_compile_definitions(SerialDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x060
 target_include_directories(TcpServerDemo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 target_link_libraries(TcpServerDemo asio)
 target_compile_definitions(TcpServerDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
+
+target_include_directories(TcpClientDemo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+target_link_libraries(TcpClientDemo asio)
+target_compile_definitions(TcpClientDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
 
 
 message(STATUS "Build completed for ${CMAKE_SYSTEM_NAME}")

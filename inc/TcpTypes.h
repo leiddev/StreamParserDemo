@@ -68,4 +68,26 @@ struct TcpConfig {
     int         backlog     = 128;
 };
 
+// -------------------------------------------------
+// 6. Connect completion callback (TCP client)
+// -------------------------------------------------
+// Fired exactly once per connect() invocation:
+//   ok == true  : socket entered Connected state
+//   ok == false : connect failed (timeout, host parse failure, refused, ...)
+// ec and detail describe the failure when ok == false; both are empty on success.
+using ConnectCallback = std::function<void(bool ok,
+                                           const asio::error_code& ec,
+                                           const std::string& detail)>;
+
+// -------------------------------------------------
+// 7. TCP client configuration struct
+// -------------------------------------------------
+// Composes TcpAdapterConfig (timer period, recv buffer, keepalive, graceful shutdown)
+// with client-specific knobs (connect timeout, TCP_NODELAY).
+struct TcpClientConfig {
+    uint32_t         connect_timeout_ms = 5000;  // async_connect timeout
+    bool             no_delay           = true;  // TCP_NODELAY on success
+    TcpAdapterConfig tcp                = {};     // reuses recv_buffer_bytes, keepalive, etc.
+};
+
 #endif  // !_TCP_TYPES_H_
