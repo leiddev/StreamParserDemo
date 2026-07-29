@@ -1,10 +1,23 @@
 /*
  * Leid 2026.7
  *
- * TCP server demo using TcpServer + TcpSessionParserAdapter
+ * TCP server demo using TcpServer + TcpSessionParserAdapter.
  *
- * Default port: 9000 (override via command line argument)
- * Default bind address: 0.0.0.0 (accept connections on all interfaces)
+ * Demonstrates:
+ *   - Accepting multiple TCP client connections
+ *   - Parsing stream data with frame detection
+ *   - Session management (connect/disconnect tracking)
+ *   - Echo response to connected clients
+ *   - Keep-alive heartbeat configuration
+ *
+ * Usage:
+ *   ./TcpServerDemo [port]
+ *
+ * Examples:
+ *   ./TcpServerDemo           # Default port 9000
+ *   ./TcpServerDemo 8080      # Listen on port 8080
+ *
+ * Note: Default bind address is 0.0.0.0 (all interfaces).
  */
 #include <iostream>
 #include <memory>

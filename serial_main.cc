@@ -1,10 +1,23 @@
 /*
  * Leid 2026.7
  *
- * Serial demo
+ * Serial demo using SerialParserAdapter + A55A55AAParser.
  *
- * Default port_name: COM1 (Windows) or /dev/ttyS1 (Linux)
- * Default baud_rate: 115200
+ * Demonstrates:
+ *   - Opening a serial port with configurable parameters
+ *   - Parsing stream data with frame detection
+ *   - Async write operations with callbacks
+ *   - Handling platform-specific serial port paths
+ *
+ * Usage:
+ *   ./SerialDemo [port_name] [baud_rate]
+ *
+ * Examples:
+ *   ./SerialDemo              # Use default: COM1 at 115200
+ *   ./SerialDemo COM3 9600    # Windows: COM3 at 9600 baud
+ *   ./SerialDemo /dev/ttyS0 115200  # Linux: ttyS0 at 115200 baud
+ *
+ * Note: Default port is COM1 on Windows, /dev/ttyS1 on Linux.
  */
 #include <string>
 #include <thread>

@@ -2,10 +2,22 @@
  * Leidi 2026.7
  *
  * TCP client demo using TcpClientParserAdapter + A55A55AAParser.
- * Connects to TcpServerDemo at 127.0.0.1:9000 by default; the parser
- * echoes every complete frame back to the server. Auto-reconnect is
- * intentionally NOT wired up in v1 -- reconnect policy lives in the
- * business layer.
+ *
+ * Demonstrates:
+ *   - Connecting to a TCP server with async operations
+ *   - Parsing stream data with frame detection
+ *   - Echo response to server (auto-reply received frames)
+ *   - Connection state callbacks (connect/disconnect)
+ *   - TCP keep-alive and NoDelay configuration
+ *
+ * Usage:
+ *   ./TcpClientDemo [host] [port]
+ *
+ * Examples:
+ *   ./TcpClientDemo                      # Default: 10.0.228.249:9000
+ *   ./TcpClientDemo 127.0.0.1 8080      # Connect to localhost:8080
+ *
+ * Note: Auto-reconnect is not wired in v1; reconnect policy lives in the business layer.
  */
 #include <iostream>
 #include <memory>
