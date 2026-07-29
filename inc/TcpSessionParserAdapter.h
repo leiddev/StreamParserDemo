@@ -140,7 +140,7 @@ public:
     //               Must be non-null and non-empty.
     // @param cb     Completion callback; may be nullptr to fire-and-forget.
     void async_write(std::shared_ptr<const std::vector<uint8_t>> frame,
-                     WriteCallback cb = nullptr) {
+                     TcpWriteCallback cb = nullptr) {
         asio::post(socket_.get_executor(),
             [self = shared_from_this(),
              frame = std::move(frame),
@@ -154,12 +154,17 @@ public:
     // posts async_write to the io_context executor. If build fails (empty frame), the
     // callback is NOT invoked and no data is sent.
     void build_and_async_write(const std::vector<uint8_t>& payload,
-                               WriteCallback cb = nullptr) {
+                               TcpWriteCallback cb = nullptr) {
         if (parser_) {
             auto frame = parser_->buildFrame(payload);
             if (!frame.empty()) {
                 auto frame_ptr = std::make_shared<std::vector<uint8_t>>(std::move(frame));
                 async_write(frame_ptr, std::move(cb));
+            } else {
+                // Empty frame: fire failure callback if provided
+                if (cb) {
+                    cb(TcpWriteResult::InvalidArg, 0, {}, "buildFrame returned empty");
+                }
             }
         }
     }
@@ -293,24 +298,24 @@ private:
     // -------------------------------------------------
     // 8. Write helpers
     // -------------------------------------------------
-    static WriteResult map_ec(const asio::error_code& ec, std::string& detail) {
-        if (!ec) return WriteResult::Ok;
+    static TcpWriteResult map_ec(const asio::error_code& ec, std::string& detail) {
+        if (!ec) return TcpWriteResult::Ok;
         detail = ec.message();
-        if (ec == asio::error::operation_aborted) return WriteResult::Cancelled;
-        if (ec == asio::error::not_connected)     return WriteResult::Disconnected;
-        if (ec == asio::error::connection_reset)   return WriteResult::Disconnected;
-        if (ec == asio::error::eof)                return WriteResult::Disconnected;
-        return WriteResult::IOError;
+        if (ec == asio::error::operation_aborted) return TcpWriteResult::Cancelled;
+        if (ec == asio::error::not_connected)     return TcpWriteResult::Disconnected;
+        if (ec == asio::error::connection_reset)   return TcpWriteResult::Disconnected;
+        if (ec == asio::error::eof)                return TcpWriteResult::Disconnected;
+        return TcpWriteResult::IOError;
     }
 
     void do_async_write(std::shared_ptr<const std::vector<uint8_t>> frame,
-                        WriteCallback cb) {
+                        TcpWriteCallback cb) {
         if (!socket_.is_open()) {
-            if (cb) cb(WriteResult::Disconnected, 0, {}, "socket not open");
+            if (cb) cb(TcpWriteResult::Disconnected, 0, {}, "socket not open");
             return;
         }
         if (!frame || frame->empty()) {
-            if (cb) cb(WriteResult::InvalidArg, 0, {}, "empty frame");
+            if (cb) cb(TcpWriteResult::InvalidArg, 0, {}, "empty frame");
             return;
         }
 

@@ -30,7 +30,7 @@ struct SerialConfig {
 // -------------------------------------------------
 // 2. Write result enum (business-layer friendly, no asio dependency)
 // -------------------------------------------------
-enum class WriteResult {
+enum class SerialWriteResult {
     Ok,          // Atomic frame transmitted successfully
     PortClosed,  // Serial port not open or already closed
     Cancelled,   // Operation aborted (close() called or adapter destroyed)
@@ -41,7 +41,7 @@ enum class WriteResult {
 // -------------------------------------------------
 // 3. Write completion callback
 // -------------------------------------------------
-using WriteCallback = std::function<void(WriteResult              result,
+using SerialWriteCallback = std::function<void(SerialWriteResult   result,
                                           size_t                   bytes,
                                           const asio::error_code&  ec,
                                           const std::string&       detail)>;

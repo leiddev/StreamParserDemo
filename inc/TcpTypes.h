@@ -14,7 +14,7 @@
 // -------------------------------------------------
 // 1. Write result enum (business-layer friendly, no asio dependency)
 // -------------------------------------------------
-enum class WriteResult {
+enum class TcpWriteResult {
     Ok,           // Atomic frame transmitted successfully
     Disconnected, // Socket closed or remote end disconnected
     Cancelled,    // Operation aborted (close() called or adapter destroyed)
@@ -31,7 +31,7 @@ enum class WriteResult {
 // @param ec       Raw asio error code; valid only within this callback.
 //                 Do not capture or hold it asynchronously.
 // @param detail   Human-readable error description; non-empty on failure
-using WriteCallback = std::function<void(WriteResult        result,
+using TcpWriteCallback = std::function<void(TcpWriteResult  result,
                                          size_t             bytes,
                                          const asio::error_code& ec,
                                          const std::string&      detail)>;

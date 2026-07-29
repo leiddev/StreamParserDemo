@@ -105,7 +105,7 @@ public:
     //               Must be non-null and non-empty.
     // @param cb     Completion callback; may be nullptr to fire-and-forget.
     void async_write(std::shared_ptr<const std::vector<uint8_t>> frame,
-        WriteCallback cb = nullptr) {
+        SerialWriteCallback cb = nullptr) {
         asio::post(port_.get_executor(),
             [self = this, frame = std::move(frame), cb = std::move(cb)]() mutable {
                 self->do_async_write(std::move(frame), std::move(cb));
@@ -116,12 +116,17 @@ public:
     // Internally calls parser_->buildFrame(payload). If build succeeds (non-empty frame),
     // posts async_write to the io_context executor. If build fails (empty frame), the
     // callback is NOT invoked and no data is sent.
-    void build_and_async_write(const std::vector<uint8_t>& payload, WriteCallback cb = nullptr) {
+    void build_and_async_write(const std::vector<uint8_t>& payload, SerialWriteCallback cb = nullptr) {
         if (parser_) {
             auto frame = parser_->buildFrame(payload);
             if (!frame.empty()) {
                 auto frame_ptr = std::make_shared<std::vector<uint8_t>>(std::move(frame));
                 async_write(frame_ptr, std::move(cb));
+            }
+        } else {
+            // Empty frame: fire failure callback if provided
+            if (cb) {
+                cb(SerialWriteResult::InvalidArg, 0, {}, "buildFrame returned empty");
             }
         }
     }
@@ -214,24 +219,24 @@ private:
         });
     }
 
-    // Translate asio::error_code to WriteResult + human-readable detail.
-    static WriteResult map_ec(const asio::error_code& ec, std::string& detail) {
-        if (!ec) return WriteResult::Ok;
+    // Translate asio::error_code to SerialWriteResult + human-readable detail.
+    static SerialWriteResult map_ec(const asio::error_code& ec, std::string& detail) {
+        if (!ec) return SerialWriteResult::Ok;
         detail = ec.message();
-        if (ec == asio::error::operation_aborted) return WriteResult::Cancelled;
-        if (ec == asio::error::bad_descriptor)     return WriteResult::PortClosed;
-        return WriteResult::IOError;
+        if (ec == asio::error::operation_aborted) return SerialWriteResult::Cancelled;
+        if (ec == asio::error::bad_descriptor)     return SerialWriteResult::PortClosed;
+        return SerialWriteResult::IOError;
     }
 
     // Core atomic write: must be called from io_context thread.
     void do_async_write(std::shared_ptr<const std::vector<uint8_t>> frame,
-                        WriteCallback cb) {
+                        SerialWriteCallback cb) {
         if (!port_.is_open()) {
-            if (cb) cb(WriteResult::PortClosed, 0, {}, "serial port not open");
+            if (cb) cb(SerialWriteResult::PortClosed, 0, {}, "serial port not open");
             return;
         }
         if (!frame || frame->empty()) {
-            if (cb) cb(WriteResult::InvalidArg, 0, {}, "empty frame");
+            if (cb) cb(SerialWriteResult::InvalidArg, 0, {}, "empty frame");
             return;
         }
 
