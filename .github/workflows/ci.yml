@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Keep the same flags everywhere so a warning on one platform is visible on all.
+  WARN_FLAGS: "-Wall -Wextra"
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Native builds: Linux + Windows on x64 (PC) and ARM64
+  # -------------------------------------------------------------------------
+  native:
+    name: ${{ matrix.slug }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slug: linux-x64
+            os: ubuntu-latest
+            arch: x64
+          - slug: windows-x64
+            os: windows-latest
+            arch: x64
+          - slug: linux-arm64
+            os: ubuntu-24.04-arm
+            arch: arm64
+          - slug: windows-arm64
+            os: windows-11-arm
+            arch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (Unix)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="${{ env.WARN_FLAGS }}"
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -A ${{ matrix.arch }} -DCMAKE_CXX_FLAGS="/W3"
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -o pipefail
+          cmake --build build --parallel "$(nproc)" 2>&1 | tee build.log
+          # First party code must stay warning free; third party asio noise is ignored.
+          if grep -E "warning:" build.log | grep -qE "/(inc|src|test)/|_main\.cc"; then
+            echo "::error::compiler warnings found in project sources"
+            grep -E "warning:" build.log || true
+            exit 1
+          fi
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Test (Unix)
+        if: runner.os != 'Windows'
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Upload build log
+        if: failure() && runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.slug }}
+          path: build.log
+          if-no-files-found: ignore
+
+  # -------------------------------------------------------------------------
+  # 32-bit x86 (classic PC) build + tests on an x64 Linux host
+  # -------------------------------------------------------------------------
+  linux-x86:
+    name: linux-x86 (32-bit PC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install multilib toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_FLAGS=-m32
+          -DCMAKE_CXX_FLAGS="-m32 ${{ env.WARN_FLAGS }}"
+
+      - name: Build
+        run: |
+          set -o pipefail
+          cmake --build build --parallel "$(nproc)" 2>&1 | tee build.log
+          if grep -E "warning:" build.log | grep -qE "/(inc|src|test)/|_main\.cc"; then
+            echo "::error::compiler warnings found in project sources"
+            grep -E "warning:" build.log || true
+            exit 1
+          fi
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # 32-bit ARM (armv7) cross build, executed through qemu-user
+  # -------------------------------------------------------------------------
+  linux-armv7:
+    name: linux-armv7 (cross + qemu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchain and qemu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-arm-linux-gnueabihf qemu-user-static
+
+      - name: Configure
+        run: >
+          cmake -S . -B build-armv7 -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_SYSTEM_NAME=Linux
+          -DCMAKE_SYSTEM_PROCESSOR=armv7l
+          -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc
+          -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++
+          -DCMAKE_CXX_FLAGS="${{ env.WARN_FLAGS }}"
+
+      - name: Build
+        run: |
+          set -o pipefail
+          cmake --build build-armv7 --parallel "$(nproc)" 2>&1 | tee build.log
+          if grep -E "warning:" build.log | grep -qE "/(inc|src|test)/|_main\.cc"; then
+            echo "::error::compiler warnings found in project sources"
+            grep -E "warning:" build.log || true
+            exit 1
+          fi
+
+      - name: Verify target architecture
+        run: |
+          file build-armv7/LogSmokeTest
+          file build-armv7/TcpServerDemo | grep -q "ARM" || {
+            echo "::error::binaries are not ARM"; exit 1; }
+
+      - name: Test (under qemu)
+        run: qemu-arm-static -L /usr/arm-linux-gnueabihf ./build-armv7/LogSmokeTest

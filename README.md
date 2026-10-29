@@ -1,5 +1,7 @@
 # StreamParserDemo
 
+[![CI](https://github.com/leiddev/StreamParserDemo/actions/workflows/ci.yml/badge.svg)](https://github.com/leiddev/StreamParserDemo/actions/workflows/ci.yml)
+
 基于 ASIO 的流式数据解析框架，支持串口、TCP、UDP 多种通信方式。
 
 ## 项目概述
@@ -318,6 +320,34 @@ splog::set_stderr_fallback(false);
 
 `test/log_smoke_test.cc` 是这套日志设施的冒烟测试（`LogSmokeTest` 目标），
 覆盖回调安装、级别过滤、静音、异常隔离与 stderr 兜底。
+
+## 持续集成
+
+`.github/workflows/ci.yml` 在 `push` / `pull_request` / 手动触发时，覆盖以下平台：
+
+| Job | 平台 | 工具链 | 测试 |
+|-----|------|--------|------|
+| `linux-x64` | Ubuntu（PC，x86_64） | GCC，`-Wall -Wextra` | `ctest`（log_smoke + tcp_e2e） |
+| `windows-x64` | Windows（PC，x86_64） | MSVC（VS 2022，`/W3`） | `ctest -C Release` |
+| `linux-x86` | Ubuntu，32 位 x86 | GCC `-m32` + multilib | `ctest` |
+| `linux-arm64` | Ubuntu ARM64 原生 runner | GCC | `ctest` |
+| `linux-armv7` | 交叉编译 + `qemu-arm-static` | arm-linux-gnueabihf | `LogSmokeTest` 在 qemu 下运行 |
+| `windows-arm64` | Windows 11 ARM64 原生 runner | MSVC ARM64 | `ctest -C Release` |
+
+CI 中会编译并运行：
+
+- `log_smoke` —— 日志回调设施（安装/过滤/静音/异常隔离/stderr 兜底）；
+- `tcp_e2e` —— 启动 `TcpServerDemo`，喂入一个合法 `A5 5A` 帧，校验帧重组回调触发。
+
+另外 **本项目自身代码的编译告警视为失败**（第三方 asio 的告警被忽略），保证多平台下维持零告警。
+
+本地跑同样的检查：
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-Wall -Wextra"
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
 
 ## 依赖
 
