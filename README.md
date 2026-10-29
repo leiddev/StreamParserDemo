@@ -28,7 +28,12 @@ StreamParserDemo/
 │   ├── TcpServer.h             # TCP 服务器
 │   ├── TcpTypes.h              # TCP 相关类型定义
 │   ├── UdpParserAdapter.h       # UDP 适配器
-│   └── UdpTypes.h              # UDP 相关类型定义
+│   ├── UdpTypes.h              # UDP 相关类型定义
+│   └── StreamParserLog.h       # 可插拔日志回调接口（宿主接入自己的日志后端）
+├── src/
+│   └── StreamParser.cc          # 解析器基类实现
+├── test/
+│   └── log_smoke_test.cc        # 日志设施冒烟测试
 ├── serial_main.cc               # 串口通信示例
 ├── tcp_server_main.cc           # TCP 服务器示例
 ├── tcp_client_main.cc           # TCP 客户端示例
@@ -242,6 +247,77 @@ protected:
 | Cancelled | 操作被取消 |
 | IOError | I/O 错误 |
 | InvalidArg | 无效参数 |
+
+## 日志
+
+库内部不再直接向 `std::cout` / `std::cerr` 打印。所有诊断信息统一通过
+`inc/StreamParserLog.h` 提供的日志回调接口输出，宿主工程可以把它们转发到自己的
+日志后端（spdlog、glog、log4cxx、文件日志……）。
+
+### 库内日志点
+
+| 组件 (component) | 级别 | 位置 | 说明 |
+|------------------|------|------|------|
+| serial | INFO | `SerialParserAdapter::do_open` | 串口打开成功（含波特率） |
+| serial | ERROR | `SerialParserAdapter::do_open` | 串口打开 / 参数配置失败（异常仍向上抛出） |
+| serial | WARN | `SerialParserAdapter::start_read` | 异步读错误（`operation_aborted` 不算） |
+| tcp | WARN | `TcpSessionParserAdapter` 读回调 | 会话读错误，随后触发断开回调 |
+| tcp-client | ERROR | `TcpClientParserAdapter::do_connect` | host 不是合法的 IP 字面量 |
+| tcp-client | WARN | `TcpClientParserAdapter::on_connect` | 连接失败（含超时被取消） |
+| tcp-client | DEBUG | `TcpClientParserAdapter::on_connect` | `TCP_NODELAY` 设置失败 |
+| tcp-client | WARN | `TcpClientParserAdapter` 读回调 | 读错误，随后断开 |
+| tcp-server | WARN | `TcpServer::start` | `bind_address` 非法，回退到 `0.0.0.0` |
+| tcp-server | ERROR | `TcpServer::start` | bind 失败 / listen 失败 |
+| tcp-server | INFO | `TcpServer::start` | 开始监听（地址 + 端口） |
+| tcp-server | INFO | `TcpServer::stop` | 已停止 |
+| tcp-server | ERROR | `TcpServer::do_accept` | accept 失败（`operation_aborted` 除外） |
+| tcp-server | WARN | `TcpServer::do_accept` | 会话工厂返回空 adapter，连接被丢弃 |
+| udp | ERROR | `UdpParserAdapter::do_open` | socket 打开 / 绑定失败 |
+| udp | INFO | `UdpParserAdapter::do_open` | 绑定成功（含本地 / 远端地址） |
+| udp | WARN | `UdpParserAdapter` 接收回调 | 接收错误 |
+
+> 核心 `StreamParser` 不产生任何日志，帧解析错误统一通过 `ErrorCallback` 上报，
+> 两者互不干扰。
+
+### 接入宿主日志后端
+
+```cpp
+#include "StreamParserLog.h"
+
+// 1) 安装回调（在构造适配器之前调用一次即可，可随时替换 / 清除）
+splog::set_callback([](const splog::Record& r) {
+    // r.level / r.component / r.message / r.file / r.line
+    my_logger.log(to_my_level(r.level), "[{}] {}", r.component, r.message);
+});
+
+// 2) 可选：过滤级别（默认 info），Level::off 可完全静音
+splog::set_level(splog::Level::debug);
+
+// 3) 可选：关闭"未安装回调时打印到 stderr"的兜底行为
+splog::set_stderr_fallback(false);
+```
+
+| API | 说明 |
+|-----|------|
+| `splog::set_callback(cb)` | 安装 / 替换日志回调（传空回调等同清除） |
+| `splog::clear_callback()` | 清除回调，恢复 stderr 兜底 |
+| `splog::callback()` | 获取当前回调副本（为空表示未安装） |
+| `splog::set_level(level)` / `splog::level()` | 设置 / 读取最低级别，默认 `info` |
+| `splog::set_stderr_fallback(bool)` | 未安装回调时是否仍打印到 `std::cerr`（默认开） |
+| `splog::enabled(level)` | 判断某级别是否会被输出（用于避免无谓的格式化开销） |
+| `splog::format(record)` | 把记录格式化为 `[LEVEL] [component] message` |
+| `SP_LOG_INFO("comp", ... << x)` | 库内部使用的发射宏（`TRACE/DEBUG/INFO/WARN/ERROR`） |
+
+注意事项：
+
+- 回调在产生日志的线程上被调用（通常是 asio `io_context` 线程），实现需线程安全；
+- 回调位于 I/O 路径上，不要做阻塞 / 耗时操作；
+- 回调内抛出的异常会被 `write()` 吞掉，不会影响解析器；
+- 不同动态库 / 静态库混用时，请确保所有翻译单元包含的是同一份 `StreamParserLog.h`
+  （头文件内是 `inline` 函数的函数内静态量，C++14 下跨 TU 唯一）。
+
+`test/log_smoke_test.cc` 是这套日志设施的冒烟测试（`LogSmokeTest` 目标），
+覆盖回调安装、级别过滤、静音、异常隔离与 stderr 兜底。
 
 ## 依赖
 
