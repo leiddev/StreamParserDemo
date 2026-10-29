@@ -60,6 +60,10 @@ target_link_libraries(UdpDemo asio)
 target_compile_definitions(UdpDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
 
 
+# Dependency free smoke test for the pluggable logging facility (StreamParserLog.h)
+add_executable(LogSmokeTest test/log_smoke_test.cc)
+target_include_directories(LogSmokeTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+
 message(STATUS "Build completed for ${CMAKE_SYSTEM_NAME}")
 message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")

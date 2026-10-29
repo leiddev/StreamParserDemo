@@ -18,6 +18,7 @@
 #include <iostream>
 #include "TcpTypes.h"
 #include "StreamParser.h"
+#include "StreamParserLog.h"
 
 #ifdef __linux__
 #include <netinet/tcp.h>
@@ -220,7 +221,7 @@ private:
         asio::ip::address addr = asio::ip::address::from_string(host_, ec);
         if (ec) {
             std::string detail = "invalid host literal: " + host_ + " (" + ec.message() + ")";
-            std::cerr << "[TcpClient] " << detail << std::endl;
+            SP_LOG_ERROR("tcp-client", detail);
             if (connect_cb_) connect_cb_(false, ec, detail);
             return;
         }
@@ -258,7 +259,7 @@ private:
         // Always end up back at Disconnected on failure path.
         if (ec) {
             std::string detail = "connect failed: " + ec.message();
-            std::cerr << "[TcpClient] " << detail << std::endl;
+            SP_LOG_WARN("tcp-client", detail << " (host " << host_ << ":" << port_ << ")");
             state_ = State::Disconnected;
             // Best-effort socket cleanup so a subsequent connect() works.
             asio::error_code close_ec;
@@ -273,8 +274,8 @@ private:
             asio::error_code soptec;
             socket_.set_option(option, soptec);
             if (soptec) {
-                std::cerr << "[TcpClient] set_option(TCP_NODELAY) failed: "
-                          << soptec.message() << std::endl;
+                SP_LOG_DEBUG("tcp-client", "set_option(TCP_NODELAY) failed: "
+                                           << soptec.message());
             }
         }
 
@@ -447,8 +448,8 @@ private:
         }
 
         // Other errors: connection_reset, network_down, etc.
-        std::cerr << "[TcpClient " << client_tag() << "] read error: "
-                  << ec.message() << std::endl;
+        SP_LOG_WARN("tcp-client", "[" << client_tag() << "] read error: "
+                                      << ec.message());
         handle_disconnect(ec);
     }
 

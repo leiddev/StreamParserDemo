@@ -11,6 +11,7 @@
 #include <iostream>
 #include "TcpTypes.h"
 #include "TcpSessionParserAdapter.h"
+#include "StreamParserLog.h"
 
 // TcpServer: TCP acceptor that listens on a port and manages incoming connections.
 // Uses a SessionFactory to create per-connection TcpSessionParserAdapter instances.
@@ -34,6 +35,9 @@ public:
         asio::error_code ec;
         asio::ip::address addr = asio::ip::address::from_string(config_.bind_address, ec);
         if (ec) {
+            SP_LOG_WARN("tcp-server", "invalid bind address '" << config_.bind_address
+                                              << "', falling back to 0.0.0.0: "
+                                              << ec.message());
             addr = asio::ip::address_v4::any();
         }
         asio::ip::tcp::endpoint endpoint(addr, config_.port);
@@ -41,16 +45,17 @@ public:
         acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
         acceptor_.bind(endpoint, ec);
         if (ec) {
-            std::cerr << "TcpServer bind error: " << ec.message() << std::endl;
+            SP_LOG_ERROR("tcp-server", "bind error on " << config_.bind_address << ":"
+                                                       << config_.port << ": " << ec.message());
             return;
         }
         acceptor_.listen(config_.backlog, ec);
         if (ec) {
-            std::cerr << "TcpServer listen error: " << ec.message() << std::endl;
+            SP_LOG_ERROR("tcp-server", "listen error: " << ec.message());
             return;
         }
-        std::cout << "TcpServer listening on " << config_.bind_address
-                  << ":" << config_.port << std::endl;
+        SP_LOG_INFO("tcp-server", "listening on " << config_.bind_address
+                                                  << ":" << config_.port);
         do_accept();
     }
 
@@ -59,7 +64,7 @@ public:
         asio::error_code ec;
         acceptor_.cancel(ec);
         acceptor_.close(ec);
-        std::cout << "TcpServer stopped." << std::endl;
+        stop_log_guard();
     }
 
     ~TcpServer() {
@@ -67,17 +72,28 @@ public:
     }
 
 private:
+    // stop() is noexcept, so the informational record is emitted defensively.
+    void stop_log_guard() noexcept {
+        try {
+            SP_LOG_INFO("tcp-server", "stopped");
+        } catch (...) {
+        }
+    }
+
     void do_accept() {
         acceptor_.async_accept(
             [this](const asio::error_code& ec, asio::ip::tcp::socket socket) {
                 if (ec) {
                     if (ec != asio::error::operation_aborted) {
-                        std::cerr << "TcpServer accept error: " << ec.message() << std::endl;
+                        SP_LOG_ERROR("tcp-server", "accept error: " << ec.message());
                     }
                     return;
                 }
                 auto adapter = factory_(std::move(socket));
-                if (adapter) {
+                if (!adapter) {
+                    SP_LOG_WARN("tcp-server", "session factory returned no adapter, "
+                                              "connection dropped");
+                } else {
                     adapter->start();
                 }
                 do_accept();

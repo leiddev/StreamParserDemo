@@ -15,6 +15,7 @@
 #include <functional>
 #include "SerialTypes.h"
 #include "StreamParser.h"
+#include "StreamParserLog.h"
 
 // -------------------------------------------------
 // SerialParserAdapter
@@ -139,13 +140,23 @@ private:
             port_.close(ec);
         }
 
-        port_.open(port_name_);
-        apply_config(config_);
+        // port_.open()/set_option() report failures by throwing asio::system_error.
+        // Log them here (the constructor rethrows afterwards) so that a failed
+        // device open is visible in the host application's log.
+        try {
+            port_.open(port_name_);
+            apply_config(config_);
+        } catch (const std::exception& ex) {
+            SP_LOG_ERROR("serial", "open " << port_name_ << " failed: " << ex.what());
+            throw;
+        }
         closing_ = false;
 
         if (parser_) {
             parser_->reset();
         }
+
+        SP_LOG_INFO("serial", "opened " << port_name_ << " @ " << config_.baud_rate << " baud");
 
         start_read();
         start_timeout_timer();
@@ -204,7 +215,8 @@ private:
                     parser_->feed(buf_.data(), bytes);
                     start_read();
                 } else if (ec != asio::error::operation_aborted) {
-                    std::cerr << "Serial read error: " << ec.message() << std::endl;
+                    SP_LOG_WARN("serial", "read error on " << port_name_ << ": "
+                                                           << ec.message());
                 }
             });
     }

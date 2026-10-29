@@ -13,6 +13,7 @@
 #include <functional>
 #include "TcpTypes.h"
 #include "StreamParser.h"
+#include "StreamParserLog.h"
 
 #ifdef __linux__
 #include <netinet/tcp.h>
@@ -254,7 +255,7 @@ private:
         }
 
         // Other errors: connection_reset, network_down, etc.
-        std::cerr << "[" << tag_ << "] TCP read error: " << ec.message() << std::endl;
+        SP_LOG_WARN("tcp", "[" << tag_ << "] TCP read error: " << ec.message());
         handle_disconnect();
     }
 

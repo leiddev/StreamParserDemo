@@ -22,6 +22,7 @@
 #include <iostream>
 #include "UdpTypes.h"
 #include "StreamParser.h"
+#include "StreamParserLog.h"
 
 // -------------------------------------------------
 // UdpParserAdapter
@@ -216,7 +217,7 @@ private:
         socket_.open(asio::ip::udp::v4(), ec);
         if (ec) {
             std::string detail = "socket open failed: " + ec.message();
-            std::cerr << "[UdpAdapter] " << detail << std::endl;
+            SP_LOG_ERROR("udp", detail);
             state_ = State::Closed;
             if (open_cb_) open_cb_(false, ec, detail);
             return;
@@ -232,7 +233,7 @@ private:
         socket_.bind(local_ep, ec);
         if (ec) {
             std::string detail = "bind failed: " + ec.message();
-            std::cerr << "[UdpAdapter] " << detail << std::endl;
+            SP_LOG_ERROR("udp", detail);
             socket_.close(ec);
             state_ = State::Closed;
             if (open_cb_) open_cb_(false, ec, detail);
@@ -257,7 +258,7 @@ private:
         start_timeout_timer();
 
         std::string tag = tag_string();
-        std::cout << "[UdpAdapter] bound to " << tag << std::endl;
+        SP_LOG_INFO("udp", "bound to " << tag);
         if (open_cb_) open_cb_(true, {}, "bound to " + tag);
     }
 
@@ -337,7 +338,7 @@ private:
             return;
         }
 
-        std::cerr << "[UdpAdapter] receive error: " << ec.message() << std::endl;
+        SP_LOG_WARN("udp", "receive error on " << tag_string() << ": " << ec.message());
         // For UDP, we continue receiving after most errors (unlike TCP)
         if (state_ == State::Open) {
             start_receive();

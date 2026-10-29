@@ -27,10 +27,21 @@
 #include <asio.hpp>
 #include "TcpServer.h"
 #include "TcpSessionParserAdapter.h"
+#include "StreamParserLog.h"
 #include "A55A55AAParser.h"
 
 static std::unordered_map<std::string, std::weak_ptr<TcpSessionParserAdapter>> g_sessions;
 static std::mutex g_sessions_mutex;
+
+// Demo: forward the library's internal diagnostics to this program's logging
+// backend. Replace the body with spdlog / glog / log4cxx / a file writer ...
+static void installLogSink() {
+    splog::set_level(splog::Level::debug);   // Level::off silences the library
+    splog::set_callback([](const splog::Record& r) {
+        std::cout << "[lib][" << splog::level_name(r.level) << "][" << r.component
+                  << "] " << r.message << std::endl;
+    });
+}
 
 static void onDisconnect(const std::string& tag) {
     std::cout << "[Disconnect] " << tag << std::endl;
@@ -40,6 +51,8 @@ static void onDisconnect(const std::string& tag) {
 
 int main(int argc, char* argv[]) {
     std::cout << "=== TCP Stream Parser Demo ===" << std::endl;
+
+    installLogSink();
 
     uint16_t port = 9000;
     if (argc >= 2) port = static_cast<uint16_t>(std::stoi(argv[1]));
