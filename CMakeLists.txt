@@ -64,6 +64,31 @@ target_compile_definitions(UdpDemo PRIVATE ASIO_STANDALONE _WIN32_WINNT=0x0601)
 add_executable(LogSmokeTest test/log_smoke_test.cc)
 target_include_directories(LogSmokeTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 
+# ---------------------------------------------------------------------------
+# Tests (ctest --test-dir build -C Release --output-on-failure)
+# ---------------------------------------------------------------------------
+enable_testing()
+
+add_test(NAME log_smoke COMMAND LogSmokeTest)
+
+# End-to-end test: start TcpServerDemo, feed it one A5 5A frame, check the frame
+# callback fires. Needs a python 3 interpreter, silently skipped otherwise.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.12)
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    set(_sp_python "${Python3_EXECUTABLE}")
+else()
+    find_program(_sp_python NAMES python3 python)
+endif()
+
+if(_sp_python)
+    add_test(NAME tcp_e2e
+             COMMAND ${_sp_python} ${CMAKE_CURRENT_SOURCE_DIR}/test/e2e_tcp_test.py
+                     $<TARGET_FILE:TcpServerDemo>)
+    set_tests_properties(tcp_e2e PROPERTIES TIMEOUT 90)
+else()
+    message(STATUS "python3 not found, tcp_e2e test disabled")
+endif()
+
 message(STATUS "Build completed for ${CMAKE_SYSTEM_NAME}")
 message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
