@@ -44,11 +44,12 @@ public:
         //   2 bytes      2 bytes        N bytes        1 bytes     2 bytes
         // LenHi LenLo = payload.size() + 1 (checksum) + 2 (trailer occupies 2 bytes)
 
-        uint16_t checksum_trailer_len = 1 + 2;
+        const uint16_t checksum_trailer_len = 1 + 2;
+        const size_t kMaxLenField = 0xFFFF;   // LenHi LenLo is 16 bit
 
         // payload.size() + trailer_len must fit in uint16_t (max 0xFFFF).
         // Check before the static_cast to avoid silent truncation.
-        if (payload.size() > 0xFFFF - checksum_trailer_len) {
+        if (payload.size() > kMaxLenField - checksum_trailer_len) {
             std::string detail = "build payload length too large: " + std::to_string(payload.size());
             reportError(ErrorCode::ProtocolError, detail);
             return {};

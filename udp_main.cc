@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
                 std::vector<uint8_t> response(data, data + len);
                 g_adapter->build_and_async_write(response,
                     [](UdpWriteResult r, size_t n,
-                       const asio::error_code& ec,
+                       const asio::error_code& /*ec*/,
                        const std::string& detail) {
                         if (r == UdpWriteResult::Ok) {
                             std::cout << "[Echo] sent " << n << " bytes to last sender" << std::endl;
@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
                     adapter->async_send_to(remote_ep,
                         std::make_shared<std::vector<uint8_t>>(payload),
                         [i](UdpWriteResult r, size_t n,
-                            const asio::error_code& ec,
+                            const asio::error_code& /*ec*/,
                             const std::string& detail) {
                             if (r == UdpWriteResult::Ok) {
                                 std::cout << "[Init Send #" << i << "] sent " << n << " bytes" << std::endl;

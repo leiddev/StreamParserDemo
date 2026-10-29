@@ -471,7 +471,7 @@ private:
     // -------------------------------------------------
     // 9. Disconnect handling (from Connected side)
     // -------------------------------------------------
-    void handle_disconnect(const asio::error_code& ec) {
+    void handle_disconnect(const asio::error_code& /*ec*/) {
         if (state_ != State::Connected) {
             return;
         }

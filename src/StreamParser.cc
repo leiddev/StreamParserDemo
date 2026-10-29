@@ -4,9 +4,9 @@
 #include "StreamParser.h"
 
 StreamParser::StreamParser(const std::string& tag, uint32_t timeout_ms, size_t max_frame_size)
-    : m_tag(tag)
+    : m_max_frame_size(max_frame_size)   // declaration order: m_max_frame_size comes first
+    , m_tag(tag)
     , m_timeout_ms(timeout_ms)
-    , m_max_frame_size(max_frame_size)
 {
     m_buf.reserve(max_frame_size);
     m_last_activity = std::chrono::steady_clock::now();

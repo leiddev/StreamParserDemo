@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
         // 4. Test Case: build_and_async_write with callback
         g_adapter->build_and_async_write({ 0xAA, 0xBB, 0xCC },
             [](SerialWriteResult r, size_t n,
-                const asio::error_code& ec, const std::string& detail) {
+                const asio::error_code& /*ec*/, const std::string& detail) {
                 if (r == SerialWriteResult::Ok) {
                     std::cout << "[build_and_async_write] sent " << n << " bytes" << std::endl;
                 } else {
