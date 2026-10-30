@@ -17,6 +17,8 @@
 #include "StreamParser.h"
 #include "StreamParserLog.h"
 
+namespace sp {
+
 // -------------------------------------------------
 // SerialParserAdapter
 //
@@ -268,5 +270,7 @@ private:
     std::string                   port_name_;
     SerialConfig                  config_;
 };
+
+}  // namespace sp
 
 #endif  // !_SERIAL_PARSER_ADAPTER_H_

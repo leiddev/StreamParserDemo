@@ -28,6 +28,9 @@
 #include "TcpClientParserAdapter.h"
 #include "A55A55AAParser.h"
 
+// Every adapter lives in namespace sp.
+using namespace sp;
+
 static std::shared_ptr<TcpClientParserAdapter> g_client;
 
 static void onConnect(bool ok,

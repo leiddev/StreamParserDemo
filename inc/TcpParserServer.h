@@ -2,8 +2,8 @@
  * Leid 2026.7
  */
 #pragma once
-#ifndef _TCP_SERVER_H_
-#define _TCP_SERVER_H_
+#ifndef _TCP_PARSER_SERVER_H_
+#define _TCP_PARSER_SERVER_H_
 
 #include <asio.hpp>
 #include <functional>
@@ -12,6 +12,8 @@
 #include "TcpTypes.h"
 #include "TcpSessionParserAdapter.h"
 #include "StreamParserLog.h"
+
+namespace sp {
 
 // TcpServer: TCP acceptor that listens on a port and manages incoming connections.
 // Uses a SessionFactory to create per-connection TcpSessionParserAdapter instances.
@@ -31,7 +33,9 @@ public:
     TcpServer(TcpServer&&) = delete;
     TcpServer& operator=(TcpServer&&) = delete;
 
-    void listen() {
+    // Returns false when the socket could not be bound or put into listen
+    // state; the caller can then treat the server as unavailable.
+    bool listen() {
         asio::error_code ec;
         asio::ip::address addr = asio::ip::address::from_string(config_.bind_address, ec);
         if (ec) {
@@ -41,22 +45,28 @@ public:
             addr = asio::ip::address_v4::any();
         }
         asio::ip::tcp::endpoint endpoint(addr, config_.port);
-        acceptor_.open(endpoint.protocol());
-        acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+        acceptor_.open(endpoint.protocol(), ec);
+        if (ec) {
+            SP_LOG_ERROR("tcp-server", "open error on " << config_.bind_address << ":"
+                                                       << config_.port << ": " << ec.message());
+            return false;
+        }
+        acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true), ec);
         acceptor_.bind(endpoint, ec);
         if (ec) {
             SP_LOG_ERROR("tcp-server", "bind error on " << config_.bind_address << ":"
                                                        << config_.port << ": " << ec.message());
-            return;
+            return false;
         }
         acceptor_.listen(config_.backlog, ec);
         if (ec) {
             SP_LOG_ERROR("tcp-server", "listen error: " << ec.message());
-            return;
+            return false;
         }
         SP_LOG_INFO("tcp-server", "listening on " << config_.bind_address
                                                   << ":" << config_.port);
         do_accept();
+        return true;
     }
 
     void stop() noexcept {
@@ -86,6 +96,9 @@ private:
                 if (ec) {
                     if (ec != asio::error::operation_aborted) {
                         SP_LOG_ERROR("tcp-server", "accept error: " << ec.message());
+                        // Keep accepting: a single failed connection attempt
+                        // (e.g. a reset from the peer) must not kill the server.
+                        do_accept();
                     }
                     return;
                 }
@@ -106,4 +119,6 @@ private:
     std::function<std::shared_ptr<TcpSessionParserAdapter>(asio::ip::tcp::socket)> factory_;
 };
 
-#endif  // !_TCP_SERVER_H_
+}  // namespace sp
+
+#endif  // !_TCP_PARSER_SERVER_H_

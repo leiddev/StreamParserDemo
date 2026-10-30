@@ -25,10 +25,13 @@
 #include <mutex>
 #include <cstdio>
 #include <asio.hpp>
-#include "TcpServer.h"
+#include "TcpParserServer.h"
 #include "TcpSessionParserAdapter.h"
 #include "StreamParserLog.h"
 #include "A55A55AAParser.h"
+
+// Every adapter lives in namespace sp.
+using namespace sp;
 
 static std::unordered_map<std::string, std::weak_ptr<TcpSessionParserAdapter>> g_sessions;
 static std::mutex g_sessions_mutex;

@@ -11,6 +11,8 @@
 #include <vector>
 #include <cstdint>
 
+namespace sp {
+
 // -------------------------------------------------
 // 1. Write result enum (business-layer friendly, no asio dependency)
 // -------------------------------------------------
@@ -89,5 +91,7 @@ struct TcpClientConfig {
     bool             no_delay           = true;  // TCP_NODELAY on success
     TcpAdapterConfig tcp                = {};     // reuses recv_buffer_bytes, keepalive, etc.
 };
+
+}  // namespace sp
 
 #endif  // !_TCP_TYPES_H_

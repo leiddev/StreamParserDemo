@@ -8,6 +8,7 @@
 #include <asio.hpp>
 #include <memory>
 #include <array>
+#include <chrono>
 #include <string>
 #include <vector>
 #include <functional>
@@ -21,11 +22,18 @@
 #endif
 
 #ifdef _WIN32
-#include <windows.h>
+// winsock2.h must come before windows.h, otherwise the legacy winsock.h is
+// pulled in first and the two sets of socket definitions conflict.
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <winsock2.h>
+#include <windows.h>
 #include <mswsock.h>
 #include <mstcpip.h>
 #endif
+
+namespace sp {
 
 // -------------------------------------------------
 // TcpSessionParserAdapter
@@ -208,15 +216,10 @@ private:
 #endif
 
 #ifdef _WIN32
-        struct tcp_keepalive {
-            ULONG onoff;
-            ULONG keepalivetime;
-            ULONG keepaliveinterval;
-        } k = {
-            1,
-            static_cast<ULONG>(config_.keepalive_idle_seconds * 1000),
-            static_cast<ULONG>(config_.keepalive_interval_seconds * 1000)
-        };
+        tcp_keepalive k;
+        k.onoff = 1;
+        k.keepalivetime = static_cast<ULONG>(config_.keepalive_idle_seconds * 1000);
+        k.keepaliveinterval = static_cast<ULONG>(config_.keepalive_interval_seconds * 1000);
         DWORD bytes = 0;
         ::WSAIoctl(socket_.native_handle(), SIO_KEEPALIVE_VALS,
                    &k, sizeof(k), nullptr, 0, &bytes, nullptr, nullptr);
@@ -341,5 +344,7 @@ private:
 
     std::array<uint8_t, 4096>      recv_buf_;
 };
+
+}  // namespace sp
 
 #endif  // !_TCP_SESSION_PARSER_ADAPTER_H_

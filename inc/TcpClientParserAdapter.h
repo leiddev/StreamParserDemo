@@ -26,11 +26,18 @@
 #endif
 
 #ifdef _WIN32
-#include <windows.h>
+// winsock2.h must come before windows.h, otherwise the legacy winsock.h is
+// pulled in first and the two sets of socket definitions conflict.
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <winsock2.h>
+#include <windows.h>
 #include <mswsock.h>
 #include <mstcpip.h>
 #endif
+
+namespace sp {
 
 // -------------------------------------------------
 // TcpClientParserAdapter
@@ -548,5 +555,7 @@ private:
     std::vector<uint8_t>      recv_buf_;
     State                     state_ = State::Disconnected;
 };
+
+}  // namespace sp
 
 #endif  // !_TCP_CLIENT_PARSER_ADAPTER_H_

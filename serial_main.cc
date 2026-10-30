@@ -30,6 +30,9 @@
 #include "A55A55AAParser.h"
 #include "SerialParserAdapter.h"
 
+// Every adapter lives in namespace sp.
+using namespace sp;
+
 // Global adapter pointer
 std::unique_ptr<SerialParserAdapter> g_adapter;
 

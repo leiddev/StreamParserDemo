@@ -23,15 +23,16 @@ StreamParserDemo/
 ├── inc/                          # 头文件目录
 │   ├── StreamParser.h           # 解析器基类
 │   ├── A55A55AAParser.h         # A5 5A ... 55 AA 协议解析器
+│   ├── StartEndParser.h         # 通用起止符协议解析器（0x02 ... 0x00 0x00 0x03）
 │   ├── SerialParserAdapter.h    # 串口适配器
 │   ├── SerialTypes.h            # 串口相关类型定义
 │   ├── TcpClientParserAdapter.h # TCP 客户端适配器
 │   ├── TcpSessionParserAdapter.h# TCP 会话适配器
-│   ├── TcpServer.h             # TCP 服务器
-│   ├── TcpTypes.h              # TCP 相关类型定义
+│   ├── TcpParserServer.h        # TCP 服务器
+│   ├── TcpTypes.h               # TCP 相关类型定义
 │   ├── UdpParserAdapter.h       # UDP 适配器
-│   ├── UdpTypes.h              # UDP 相关类型定义
-│   └── StreamParserLog.h       # 可插拔日志回调接口（宿主接入自己的日志后端）
+│   ├── UdpTypes.h               # UDP 相关类型定义
+│   └── StreamParserLog.h        # 可插拔日志回调接口（宿主接入自己的日志后端）
 ├── src/
 │   └── StreamParser.cc          # 解析器基类实现
 ├── test/
@@ -41,6 +42,8 @@ StreamParserDemo/
 ├── tcp_client_main.cc           # TCP 客户端示例
 └── udp_main.cc                  # UDP 通信示例
 ```
+
+所有适配器及其类型（`SerialConfig`、`TcpConfig`、`TcpWriteResult` 等）都定义在 `namespace sp` 中；示例程序在文件开头 `using namespace sp;`，头文件中请使用 `sp::` 限定。解析器基类 `StreamParser` 与具体解析器（`A55A55AAParser` 等）保持全局命名空间。
 
 ## 核心组件
 
@@ -151,6 +154,8 @@ make
 ## 使用指南
 
 ### 基本使用流程
+
+> 下文示例省略了命名空间前缀：适配器与其类型都在 `namespace sp` 中，实际代码请写 `sp::SerialParserAdapter`，或在源文件中 `using namespace sp;`。
 
 1. **创建 io_context**
 
@@ -268,11 +273,11 @@ protected:
 | tcp-client | WARN | `TcpClientParserAdapter::on_connect` | 连接失败（含超时被取消） |
 | tcp-client | DEBUG | `TcpClientParserAdapter::on_connect` | `TCP_NODELAY` 设置失败 |
 | tcp-client | WARN | `TcpClientParserAdapter` 读回调 | 读错误，随后断开 |
-| tcp-server | WARN | `TcpServer::start` | `bind_address` 非法，回退到 `0.0.0.0` |
-| tcp-server | ERROR | `TcpServer::start` | bind 失败 / listen 失败 |
-| tcp-server | INFO | `TcpServer::start` | 开始监听（地址 + 端口） |
+| tcp-server | WARN | `TcpServer::listen` | `bind_address` 非法，回退到 `0.0.0.0` |
+| tcp-server | ERROR | `TcpServer::listen` | open / bind / listen 失败（`listen()` 返回 false） |
+| tcp-server | INFO | `TcpServer::listen` | 开始监听（地址 + 端口） |
 | tcp-server | INFO | `TcpServer::stop` | 已停止 |
-| tcp-server | ERROR | `TcpServer::do_accept` | accept 失败（`operation_aborted` 除外） |
+| tcp-server | ERROR | `TcpServer::do_accept` | accept 失败（`operation_aborted` 除外，随后重新投递 accept） |
 | tcp-server | WARN | `TcpServer::do_accept` | 会话工厂返回空 adapter，连接被丢弃 |
 | udp | ERROR | `UdpParserAdapter::do_open` | socket 打开 / 绑定失败 |
 | udp | INFO | `UdpParserAdapter::do_open` | 绑定成功（含本地 / 远端地址） |

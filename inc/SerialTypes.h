@@ -10,6 +10,8 @@
 #include <string>
 #include <cstdint>
 
+namespace sp {
+
 // -------------------------------------------------
 // 1. Serial port configuration struct
 // -------------------------------------------------
@@ -45,5 +47,7 @@ using SerialWriteCallback = std::function<void(SerialWriteResult   result,
                                           size_t                   bytes,
                                           const asio::error_code&  ec,
                                           const std::string&       detail)>;
+
+}  // namespace sp
 
 #endif  // !_SERIAL_TYPES_H_

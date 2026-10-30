@@ -24,6 +24,8 @@
 #include "StreamParser.h"
 #include "StreamParserLog.h"
 
+namespace sp {
+
 // -------------------------------------------------
 // UdpParserAdapter
 //
@@ -422,5 +424,7 @@ private:
     asio::ip::udp::endpoint  remote_endpoint_;  // Last sender, for reply convenience
     State                     state_ = State::Closed;
 };
+
+}  // namespace sp
 
 #endif  // !_UDP_PARSER_ADAPTER_H_

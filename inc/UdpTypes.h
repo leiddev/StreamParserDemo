@@ -10,6 +10,8 @@
 #include <string>
 #include <cstdint>
 
+namespace sp {
+
 // -------------------------------------------------
 // 1. Write result enum (business-layer friendly, no asio dependency)
 // -------------------------------------------------
@@ -60,5 +62,7 @@ struct UdpAdapterConfig {
     size_t   send_buffer_bytes = 4096;   // Socket send buffer size (0 = system default)
     bool     reuse_address      = true;   // Set SO_REUSEADDR before bind
 };
+
+}  // namespace sp
 
 #endif  // !_UDP_TYPES_H_

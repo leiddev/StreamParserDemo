@@ -28,6 +28,9 @@
 #include "UdpParserAdapter.h"
 #include "A55A55AAParser.h"
 
+// Every adapter lives in namespace sp.
+using namespace sp;
+
 static std::shared_ptr<UdpParserAdapter> g_adapter;
 
 static void onOpen(bool ok,
