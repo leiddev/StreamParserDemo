@@ -32,18 +32,29 @@ StreamParserDemo/
 │   ├── TcpTypes.h               # TCP 相关类型定义
 │   ├── UdpParserAdapter.h       # UDP 适配器
 │   ├── UdpTypes.h               # UDP 相关类型定义
+│   ├── Transport.h              # 统一传输门面（不含 asio，推荐入口）
+│   ├── FakeTransport.h          # 测试桩传输（记录发送、注入事件）
 │   └── StreamParserLog.h        # 可插拔日志回调接口（宿主接入自己的日志后端）
 ├── src/
-│   └── StreamParser.cc          # 解析器基类实现
+│   ├── StreamParser.cc          # 解析器基类实现
+│   ├── TransportImpl.h          # 门面内部基类（asio 细节只在此处出现）
+│   ├── TransportBase.cc         # 公共 io/线程/发送队列实现
+│   ├── TransportFactory.cc      # CreateTransport 与默认解析器工厂
+│   ├── TransportSerial.cc       # 串口后端
+│   ├── TransportTcpServer.cc    # TCP 服务器后端
+│   ├── TransportTcpClient.cc    # TCP 客户端后端
+│   └── TransportUdp.cc          # UDP 后端
 ├── test/
-│   └── log_smoke_test.cc        # 日志设施冒烟测试
+│   ├── log_smoke_test.cc        # 日志设施冒烟测试
+│   └── e2e_transport_test.py    # 门面层 e2e 测试
 ├── serial_main.cc               # 串口通信示例
 ├── tcp_server_main.cc           # TCP 服务器示例
 ├── tcp_client_main.cc           # TCP 客户端示例
-└── udp_main.cc                  # UDP 通信示例
+├── udp_main.cc                  # UDP 通信示例
+└── transport_main.cc            # 统一门面示例（四种模式共用一个程序）
 ```
 
-所有公开类型——适配器（`SerialParserAdapter`、`TcpParserServer` 等）、它们的配置/回调类型（`SerialConfig`、`TcpConfig`、`TcpWriteResult` 等）以及解析器（`StreamParser`、`A55A55AAParser`、`StartEndParser`）——都定义在 `namespace sp` 中；示例程序在文件开头 `using namespace sp;`，头文件中请使用 `sp::` 限定。日志 shim 独立使用 `namespace splog`（内部辅助代码在 `splog::detail`）。
+所有公开类型——适配器（`SerialParserAdapter`、`TcpParserServer` 等）、它们的配置/回调类型（`SerialConfig`、`TcpConfig`、`TcpWriteResult` 等）、解析器（`StreamParser`、`A55A55AAParser`、`StartEndParser`）以及统一门面（`Transport`、`TransportConfig`、`TransportHandler`、`FakeTransport`、`CreateTransport`）——都定义在 `namespace sp` 中；示例程序在文件开头 `using namespace sp;`，头文件中请使用 `sp::` 限定。日志 shim 独立使用 `namespace splog`（内部辅助代码在 `splog::detail`）。
 
 ## 核心组件
 
@@ -93,6 +104,57 @@ public:
 | TcpSessionParserAdapter | TCP 会话，配合 TcpServer 管理多连接 |
 | UdpParserAdapter | UDP 通信，支持绑定本地端口和发送目标端口 |
 
+### 4. Transport（统一传输门面，推荐用法）
+
+适配器层把 `asio::io_context`、socket、会话表和写队列全部暴露给调用方，业务对象因此不得不自己持有 io 线程与连接管理。`Transport.h` 把这些细节收进一个**不依赖 asio 的**接口：业务层只描述"要哪种传输 + 收到帧/链路变化怎么处理"，其余全部由门面内部完成。
+
+实现上是 **Facade + Abstract Factory**：`CreateTransport()` 是唯一入口，按 `TransportConfig::kind` 选择实现；四个后端共同继承内部的模板方法基类（`sp::detail::TransportBase`），因此线程、发送队列、回调封送只有一份代码。
+
+```cpp
+#include "Transport.h"          // 不含 asio
+
+sp::TransportConfig cfg;
+cfg.kind = sp::TransportKind::TcpServer;
+cfg.name = "collector";
+cfg.bind_address = "0.0.0.0";
+cfg.port = 1883;
+cfg.max_links = 8;              // 超出时拒绝接入并上报 on_error
+
+sp::TransportHandler handler;
+handler.on_frame = [](const std::string& tag, const uint8_t* data, std::size_t len) {
+    // 已由解析器解帧，data 是 payload
+};
+handler.on_link_up   = [](const std::string& tag) { /* 入队 */ };
+handler.on_link_down = [](const std::string& tag, const std::string& why) { /* 入队 */ };
+handler.on_error     = [](const std::string& tag, int code, const std::string& detail) { /* 入队 */ };
+
+auto transport = sp::CreateTransport(cfg, sp::ParserFactory{}, handler);  // 空 -> 默认 A55A55AAParser
+if (!transport->start()) { /* 配置/绑定失败 */ }
+
+transport->send(tag, payload);        // 按 tag 定位链路，门面负责成帧
+transport->broadcast(payload);        // 发给所有在线链路
+transport->send_to("10.0.0.9", 9000, payload);   // 仅 UDP
+
+transport->stop();                    // 关闭链路并 join io 线程
+```
+
+约定：
+
+| 约定 | 说明 |
+|------|------|
+| 一个传输一个 io 线程 | 线程、`io_context`、每链路发送队列都在门面内部创建 |
+| 回调都在 io 线程上 | 需要访问业务状态时请自行入队/转发（`FrameQueue`、`asio::post` 等） |
+| `stop()` 不能在回调里调用 | 它会 join io 线程；请从外部线程调用 |
+| `send()` 收 payload | 成帧由门面内部的 parser 完成，业务层不再需要 `buildFrame` |
+| 每链路一个 parser | 解析器带帧缓存与超时状态，因此用 `ParserFactory` 而不是原型克隆 |
+| `max_links` / `max_pending_frames` | 分别用于连接数准入和每链路发送队列的背压（0 表示不限连接数） |
+
+`kind` 与 `tag` 的对应关系：串口用设备名；TCP 服务器用客户端的 `ip:port`；TCP 客户端用服务器 `host:port`；UDP 用对端 `ip:port`（另外还有 `udp:<port>` 代表 socket 自身）。UDP 默认发往最近一次收到数据的对端，`send_to()` 可指定目标。
+
+`FakeTransport.h` 提供一个 header-only 的测试桩：它记录每次 `send()`/`broadcast()`/`send_to()` 的内容，并支持注入帧、链路上下线、错误以及让 `start()` 失败，便于对业务层做单元测试；它同时也可作为 `Transport` 最小契约的参考实现。
+
+`transport_main.cc` / `TransportDemo` 是门面层的示例：同一份业务代码用 `tcp_server`、`tcp_client`、`udp`、`serial` 四种模式运行，程序中不出现任何 asio 类型。
+
 ## 快速开始
 
 ### 编译项目
@@ -108,7 +170,19 @@ cmake ..
 make
 ```
 
+生成 `SerialDemo`、`TcpServerDemo`、`TcpClientDemo`、`UdpDemo`、`TransportDemo` 五个示例程序以及 `log_smoke_test` 测试目标。
+
 ### 运行示例
+
+#### 统一门面（四种模式共用一个程序）
+
+```bash
+./TransportDemo tcp_server 10050
+./TransportDemo tcp_client 127.0.0.1 10050
+./TransportDemo udp 9000
+./TransportDemo serial COM3 115200
+# 运行时输入 "send <text>" 广播文本，"q" 退出
+```
 
 #### 串口通信
 
