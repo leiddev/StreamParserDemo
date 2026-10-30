@@ -105,11 +105,13 @@ private:
             peers_.erase(tag);
             return tag;
         }
-        registerPeerLink(tag, peer);
+        /* The destination is resolved from `tag` on every write, so the endpoint
+           itself is not needed here. */
+        registerPeerLink(tag);
         return tag;
     }
 
-    void registerPeerLink(const std::string& tag, const asio::ip::udp::endpoint& peer) {
+    void registerPeerLink(const std::string& tag) {
         addLink(tag, [this, tag](const Frame& frame, WriteDone done) {
             std::shared_ptr<UdpParserAdapter> adapter = adapter_;
             if (!adapter) {
