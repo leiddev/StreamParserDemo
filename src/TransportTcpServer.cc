@@ -101,8 +101,10 @@ private:
             });
         });
 
-        SP_LOG_INFO("transport", config().name << ": client " << tag << " connected, "
-                                               << linkCount() << " link(s)");
+        if (config().log_link_events) {
+            SP_LOG_INFO("transport", config().name << ": client " << tag << " connected, "
+                                                   << linkCount() << " link(s)");
+        }
         emitLinkUp(tag);
         return session;
     }
@@ -113,8 +115,10 @@ private:
             sessions_.erase(tag);
         }
         removeLink(tag);
-        SP_LOG_INFO("transport", config().name << ": client " << tag << " disconnected, "
-                                               << linkCount() << " link(s)");
+        if (config().log_link_events) {
+            SP_LOG_INFO("transport", config().name << ": client " << tag << " disconnected, "
+                                                   << linkCount() << " link(s)");
+        }
         emitLinkDown(tag, "connection closed");
     }
 

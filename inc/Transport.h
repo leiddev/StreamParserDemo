@@ -92,6 +92,11 @@ struct TransportConfig {
     std::size_t   max_links         = 0;         // 0 = unlimited (TcpServer / Udp)
     std::size_t   max_pending_frames = 256;      // Per-link send queue (back pressure)
     bool          keep_alive        = false;
+    // Log link up/down events ("client accepted / closed"). A host that already
+    // logs them from on_link_up / on_link_down can turn this off to avoid
+    // printing two lines per event. Startup, error and retry logs are not
+    // affected by this flag.
+    bool          log_link_events   = true;
 };
 
 // -------------------------------------------------

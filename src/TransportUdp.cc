@@ -49,8 +49,10 @@ protected:
                               (detail.empty() ? ec.message() : detail));
                 return;
             }
-            SP_LOG_INFO("transport", config().name << ": udp socket bound on port "
-                                                   << adapter_->local_port());
+            if (config().log_link_events) {
+                SP_LOG_INFO("transport", config().name << ": udp socket bound on port "
+                                                       << adapter_->local_port());
+            }
             emitLinkUp(local_tag_);
             if (!config().peer_host.empty() && config().peer_port != 0) {
                 resolveAndRegister(config().peer_host, config().peer_port);
@@ -134,7 +136,9 @@ private:
                 done(result == UdpWriteResult::Ok, detail.empty() ? ec.message() : detail);
             });
         });
-        SP_LOG_INFO("transport", config().name << ": udp peer " << tag << " registered");
+        if (config().log_link_events) {
+            SP_LOG_INFO("transport", config().name << ": udp peer " << tag << " registered");
+        }
         emitLinkUp(tag);
     }
 

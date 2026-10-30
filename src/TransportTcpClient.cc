@@ -40,7 +40,9 @@ protected:
         client_->setConnectCallback([this](bool ok, const asio::error_code& ec,
                                            const std::string& detail) {
             if (ok) {
-                SP_LOG_INFO("transport", config().name << ": connected to " << tag_);
+                if (config().log_link_events) {
+                    SP_LOG_INFO("transport", config().name << ": connected to " << tag_);
+                }
                 emitLinkUp(tag_);
                 return;
             }

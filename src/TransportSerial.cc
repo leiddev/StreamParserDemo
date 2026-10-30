@@ -113,7 +113,10 @@ private:
             });
         });
 
-        SP_LOG_INFO("transport", device << ": serial port opened, " << config().baud_rate << " baud");
+        if (config().log_link_events) {
+            SP_LOG_INFO("transport",
+                        device << ": serial port opened, " << config().baud_rate << " baud");
+        }
         emitLinkUp(device);
         return true;
     }
