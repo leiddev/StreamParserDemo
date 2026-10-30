@@ -34,8 +34,15 @@ protected:
         }
 
         auto parser = makeParser(tag_);
+
+        TcpClientConfig client_cfg;
+        client_cfg.tcp.enable_keepalive           = config().keep_alive;
+        client_cfg.tcp.keepalive_idle_seconds     = config().keepalive_idle_seconds;
+        client_cfg.tcp.keepalive_interval_seconds = config().keepalive_interval_seconds;
+        client_cfg.tcp.keepalive_probes           = config().keepalive_probes;
+        client_cfg.tcp.recv_buffer_bytes          = config().recv_buffer_bytes;
         client_.reset(new TcpClientParserAdapter(io(), config().peer_host, config().peer_port,
-                                                std::move(parser), TcpClientConfig{}));
+                                                std::move(parser), client_cfg));
 
         client_->setConnectCallback([this](bool ok, const asio::error_code& ec,
                                            const std::string& detail) {

@@ -91,7 +91,17 @@ struct TransportConfig {
     std::size_t   recv_buffer_bytes = 4096;
     std::size_t   max_links         = 0;         // 0 = unlimited (TcpServer / Udp)
     std::size_t   max_pending_frames = 256;      // Per-link send queue (back pressure)
-    bool          keep_alive        = false;
+
+    // TCP keepalive (tcp_server accepted sockets and tcp_client). Detects a peer
+    // that vanished without FIN/RST - power loss, cable pull - in roughly
+    // idle + interval * probes seconds instead of waiting for a write to fail.
+    // Keepalive idle/interval/probes are applied per socket (SIO_KEEPALIVE_VALS
+    // on Windows, TCP_KEEPIDLE/KEEPINTVL/KEEPCNT on Linux).
+    bool          keep_alive                 = false;
+    int           keepalive_idle_seconds     = 30;
+    int           keepalive_interval_seconds = 5;
+    int           keepalive_probes           = 3;
+
     // Log link up/down events ("client accepted / closed"). A host that already
     // logs them from on_link_up / on_link_down can turn this off to avoid
     // printing two lines per event. Startup, error and retry logs are not

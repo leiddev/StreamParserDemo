@@ -149,6 +149,7 @@ transport->stop();                    // 关闭链路并 join io 线程
 | 每链路一个 parser | 解析器带帧缓存与超时状态，因此用 `ParserFactory` 而不是原型克隆 |
 | `max_links` / `max_pending_frames` | 分别用于连接数准入和每链路发送队列的背压（0 表示不限连接数） |
 | `log_link_events` | 是否由门面自己打印链路上下线日志，默认 `true`；宿主若已在 `on_link_up` / `on_link_down` 里记录，可置 `false` 避免同一事件打印两行（启动、错误、重连日志不受影响） |
+| `keep_alive` / `keepalive_idle_seconds` / `keepalive_interval_seconds` / `keepalive_probes` | TCP keepalive（仅 `tcp_server` 的已接受连接与 `tcp_client`），默认关闭 / 30s / 5s / 3 次；用于识别"对端静默消失"（掉电、拔线）——不开启时只能等下一次写失败才能发现。按 socket 逐连接设置（Windows 走 `SIO_KEEPALIVE_VALS`，Linux 走 `TCP_KEEPIDLE/KEEPINTVL/KEEPCNT`） |
 
 `kind` 与 `tag` 的对应关系：串口用设备名；TCP 服务器用客户端的 `ip:port`；TCP 客户端用服务器 `host:port`；UDP 用对端 `ip:port`（另外还有 `udp:<port>` 代表 socket 自身）。UDP 默认发往最近一次收到数据的对端，`send_to()` 可指定目标。
 

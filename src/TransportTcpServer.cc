@@ -84,8 +84,18 @@ private:
         }
 
         auto parser  = makeParser(tag);
+
+        // Accepted sockets get their own keepalive settings: config() describes the
+        // listener, but keepalive is a per-connection socket option.
+        TcpAdapterConfig session_cfg;
+        session_cfg.enable_keepalive           = config().keep_alive;
+        session_cfg.keepalive_idle_seconds     = config().keepalive_idle_seconds;
+        session_cfg.keepalive_interval_seconds = config().keepalive_interval_seconds;
+        session_cfg.keepalive_probes           = config().keepalive_probes;
+        session_cfg.recv_buffer_bytes          = config().recv_buffer_bytes;
+
         auto session = std::make_shared<TcpSessionParserAdapter>(io(), std::move(socket), tag,
-                                                                std::move(parser));
+                                                                std::move(parser), session_cfg);
         session->setDisconnectCallback([this](const std::string& closed) { onSessionClosed(closed); });
 
         {
