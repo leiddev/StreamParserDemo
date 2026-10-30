@@ -41,6 +41,7 @@ protected:
         client_cfg.tcp.keepalive_interval_seconds = config().keepalive_interval_seconds;
         client_cfg.tcp.keepalive_probes           = config().keepalive_probes;
         client_cfg.tcp.recv_buffer_bytes          = config().recv_buffer_bytes;
+        client_cfg.tcp.idle_timeout_ms            = config().link_idle_timeout_ms;
         client_.reset(new TcpClientParserAdapter(io(), config().peer_host, config().peer_port,
                                                 std::move(parser), client_cfg));
 

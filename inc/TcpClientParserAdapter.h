@@ -425,6 +425,7 @@ private:
     // 7. Read loop
     // -------------------------------------------------
     void start_read() {
+        last_rx_ = std::chrono::steady_clock::now();
         socket_.async_read_some(
             asio::buffer(recv_buf_),
             [self = shared_from_this()](const asio::error_code& ec, size_t bytes) {
@@ -470,9 +471,31 @@ private:
                 if (self->parser_) {
                     self->parser_->checkTimeout();
                 }
+                if (self->check_idle_timeout()) {
+                    return;  // the idle check already dropped the connection
+                }
                 self->start_timeout_timer();
             }
         });
+    }
+
+    // See TcpSessionParserAdapter::check_idle_timeout(): a silent server never
+    // completes the pending read, so only an explicit no-data timeout notices it.
+    // Returns true when the connection was dropped.
+    bool check_idle_timeout() {
+        if (config_.tcp.idle_timeout_ms == 0) {
+            return false;
+        }
+        const auto idle_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 std::chrono::steady_clock::now() - last_rx_)
+                                 .count();
+        if (idle_ms < static_cast<long long>(config_.tcp.idle_timeout_ms)) {
+            return false;
+        }
+        SP_LOG_WARN("tcp-client", "[" << client_tag() << "] no data for " << idle_ms
+                                      << " ms, closing idle link");
+        handle_disconnect(asio::error_code{});
+        return true;
     }
 
     // -------------------------------------------------
@@ -554,6 +577,8 @@ private:
 
     std::vector<uint8_t>      recv_buf_;
     State                     state_ = State::Disconnected;
+
+    std::chrono::steady_clock::time_point last_rx_ = std::chrono::steady_clock::now();
 };
 
 }  // namespace sp

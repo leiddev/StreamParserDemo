@@ -59,6 +59,13 @@ struct TcpAdapterConfig {
     int      keepalive_idle_seconds     = 30;     // Time before first probe
     int      keepalive_interval_seconds = 5;      // Interval between probes
     int      keepalive_probes           = 3;     // Number of probes before declaring dead
+
+    // Link idle timeout: close the session when no bytes arrive at all for this
+    // long. Detect the dead peer that keepalive cannot see (a live but hung
+    // peer, a half-open proxy) without waiting for a write to fail.
+    // 0 disables the check; the frame timeout (timer_period_ms + parser) only
+    // covers a frame that started and stopped mid-way.
+    uint32_t idle_timeout_ms            = 0;
 };
 
 // -------------------------------------------------

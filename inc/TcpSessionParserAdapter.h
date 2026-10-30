@@ -230,6 +230,7 @@ private:
     // 5. Read loop
     // -------------------------------------------------
     void start_read() {
+        last_rx_ = std::chrono::steady_clock::now();
         socket_.async_read_some(
             asio::buffer(recv_buf_),
             [self = shared_from_this()](const asio::error_code& ec, size_t bytes) {
@@ -272,9 +273,33 @@ private:
                 if (self->parser_) {
                     self->parser_->checkTimeout();
                 }
+                if (self->check_idle_timeout()) {
+                    return;  // the idle check already closed the session
+                }
                 self->start_timeout_timer();
             }
         });
+    }
+
+    // A peer that went silent (power loss behind a half-open proxy, hung app)
+    // never completes the pending read, so the frame timeout above cannot see
+    // it: that one only fires while a frame is half received. Close the session
+    // when not a single byte arrived for idle_timeout_ms.
+    // Returns true when the session was closed.
+    bool check_idle_timeout() {
+        if (config_.idle_timeout_ms == 0) {
+            return false;
+        }
+        const auto idle_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 std::chrono::steady_clock::now() - last_rx_)
+                                 .count();
+        if (idle_ms < static_cast<long long>(config_.idle_timeout_ms)) {
+            return false;
+        }
+        SP_LOG_WARN("tcp", "[" << tag_ << "] no data for " << idle_ms
+                               << " ms, closing idle link");
+        handle_disconnect();
+        return true;
     }
 
     // -------------------------------------------------
@@ -342,6 +367,7 @@ private:
     bool                           closing_ = false;
     DisconnectCallback             disconnect_cb_;
 
+    std::chrono::steady_clock::time_point last_rx_ = std::chrono::steady_clock::now();
     std::array<uint8_t, 4096>      recv_buf_;
 };
 

@@ -102,6 +102,12 @@ struct TransportConfig {
     int           keepalive_interval_seconds = 5;
     int           keepalive_probes           = 3;
 
+    // Close a TCP link that received no bytes for this long. Complements
+    // keepalive: it also catches a peer that is reachable but stuck (rebooted
+    // process, hung app) and needs no traffic in either direction to fire.
+    // 0 disables it. tcp_server and tcp_client only; ignored by serial/udp.
+    std::uint32_t link_idle_timeout_ms       = 0;
+
     // Log link up/down events ("client accepted / closed"). A host that already
     // logs them from on_link_up / on_link_down can turn this off to avoid
     // printing two lines per event. Startup, error and retry logs are not

@@ -93,6 +93,7 @@ private:
         session_cfg.keepalive_interval_seconds = config().keepalive_interval_seconds;
         session_cfg.keepalive_probes           = config().keepalive_probes;
         session_cfg.recv_buffer_bytes          = config().recv_buffer_bytes;
+        session_cfg.idle_timeout_ms            = config().link_idle_timeout_ms;
 
         auto session = std::make_shared<TcpSessionParserAdapter>(io(), std::move(socket), tag,
                                                                 std::move(parser), session_cfg);
