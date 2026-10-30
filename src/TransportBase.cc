@@ -297,7 +297,14 @@ void TransportBase::flush(const LinkPtr& link) {
             emitSent(link->tag, frame);
         } else {
             emitError(link->tag, kWriteFailed, detail.empty() ? std::string("write failed") : detail);
-            emitLinkDown(link->tag, "write failed");
+            /* Take the link out of the table *before* announcing the failure: the
+               owner of the removal owns the link-down event, so the socket error
+               that follows reports nothing a second time. Stop here as well - the
+               remaining frames belong to a peer that is already gone. */
+            if (removeLink(link->tag)) {
+                emitLinkDown(link->tag, "write failed");
+            }
+            return;
         }
         /* Continue with the next frame from the io thread; going through post()
            keeps a synchronously-completing writer from recursing. */
@@ -319,9 +326,9 @@ TransportBase::LinkPtr TransportBase::addLink(const std::string& tag, Writer wri
     return link;
 }
 
-void TransportBase::removeLink(const std::string& tag) {
+bool TransportBase::removeLink(const std::string& tag) {
     std::lock_guard<std::mutex> lock(link_mutex_);
-    links_.erase(tag);
+    return links_.erase(tag) > 0;
 }
 
 void TransportBase::markUp(const std::string& tag, bool up) {

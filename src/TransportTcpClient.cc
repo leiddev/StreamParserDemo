@@ -47,6 +47,7 @@ protected:
         client_->setConnectCallback([this](bool ok, const asio::error_code& ec,
                                            const std::string& detail) {
             if (ok) {
+                ensureLink();
                 if (config().log_link_events) {
                     SP_LOG_INFO("transport", config().name << ": connected to " << tag_);
                 }
@@ -60,22 +61,15 @@ protected:
         });
 
         client_->setDisconnectCallback([this](const std::string& closed) {
-            emitLinkDown(closed, "disconnected");
+            /* The link may already be gone (announced by a failed write); only the
+               remover reports the disconnect, and the next connect re-creates it. */
+            if (removeLink(closed)) {
+                emitLinkDown(closed, "disconnected");
+            }
             scheduleReconnect();
         });
 
-        addLink(tag_, [this](const Frame& frame, WriteDone done) {
-            std::shared_ptr<TcpClientParserAdapter> client = client_;
-            if (!client || !client->is_open()) {
-                done(false, "not connected");
-                return;
-            }
-            client->async_write(frame, [done](TcpWriteResult result, size_t /*bytes*/,
-                                              const asio::error_code& ec,
-                                              const std::string&      detail) {
-                done(result == TcpWriteResult::Ok, detail.empty() ? ec.message() : detail);
-            });
-        });
+        ensureLink();
 
         client_->connect();
         return true;
@@ -101,6 +95,27 @@ private:
             if (!ec && !stopping() && client_) {
                 client_->connect();
             }
+        });
+    }
+
+    /* The link table entry follows the connection, not the transport: a failed
+       write or a closed socket removes it (and reports the link down), and the
+       next successful connect puts it back. */
+    void ensureLink() {
+        if (findLink(tag_)) {
+            return;
+        }
+        addLink(tag_, [this](const Frame& frame, WriteDone done) {
+            std::shared_ptr<TcpClientParserAdapter> client = client_;
+            if (!client || !client->is_open()) {
+                done(false, "not connected");
+                return;
+            }
+            client->async_write(frame, [done](TcpWriteResult result, size_t /*bytes*/,
+                                              const asio::error_code& ec,
+                                              const std::string&      detail) {
+                done(result == TcpWriteResult::Ok, detail.empty() ? ec.message() : detail);
+            });
         });
     }
 

@@ -88,7 +88,10 @@ protected:
 
     // ---- link table ----
     LinkPtr              addLink(const std::string& tag, Writer writer);
-    void                 removeLink(const std::string& tag);
+    // Removes the link and reports whether it was still present: the caller that
+    // gets true owns the link-down event, so a write failure followed by the
+    // socket error that reports the same disconnect does not notify the host twice.
+    bool                 removeLink(const std::string& tag);
     void                 markUp(const std::string& tag, bool up);
     LinkPtr              findLink(const std::string& tag) const;
     std::vector<LinkPtr> snapshot() const;

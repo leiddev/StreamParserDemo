@@ -59,7 +59,9 @@ protected:
             }
         });
         adapter_->setCloseCallback([this](const std::string& tag) {
-            emitLinkDown(tag, "socket closed");
+            if (removeLink(tag)) {
+                emitLinkDown(tag, "socket closed");
+            }
         });
 
         adapter_->open();

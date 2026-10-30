@@ -124,7 +124,11 @@ private:
             std::lock_guard<std::mutex> lock(sessions_mutex_);
             sessions_.erase(tag);
         }
-        removeLink(tag);
+        /* A failed write may already have removed the link and announced it; only
+           the call that actually removes the link reports the disconnect. */
+        if (!removeLink(tag)) {
+            return;
+        }
         if (config().log_link_events) {
             SP_LOG_INFO("transport", config().name << ": client " << tag << " disconnected, "
                                                    << linkCount() << " link(s)");
