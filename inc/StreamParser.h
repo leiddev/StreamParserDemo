@@ -14,6 +14,8 @@
 #include <sstream>
 #include <iomanip>
 
+namespace sp {
+
 class StreamParser {
 public:
     // Complete frame callback
@@ -96,5 +98,7 @@ private:
     std::chrono::steady_clock::time_point m_last_activity;
     bool                 m_in_frame = false;        // Whether currently in mid-frame state
 };
+
+}  // namespace sp
 
 #endif  // !_STREAM_PARSER_H_

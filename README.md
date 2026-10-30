@@ -43,7 +43,7 @@ StreamParserDemo/
 └── udp_main.cc                  # UDP 通信示例
 ```
 
-所有适配器及其类型（`SerialConfig`、`TcpConfig`、`TcpWriteResult` 等）都定义在 `namespace sp` 中；示例程序在文件开头 `using namespace sp;`，头文件中请使用 `sp::` 限定。解析器基类 `StreamParser` 与具体解析器（`A55A55AAParser` 等）保持全局命名空间。
+所有公开类型——适配器（`SerialParserAdapter`、`TcpParserServer` 等）、它们的配置/回调类型（`SerialConfig`、`TcpConfig`、`TcpWriteResult` 等）以及解析器（`StreamParser`、`A55A55AAParser`、`StartEndParser`）——都定义在 `namespace sp` 中；示例程序在文件开头 `using namespace sp;`，头文件中请使用 `sp::` 限定。日志 shim 独立使用 `namespace splog`（内部辅助代码在 `splog::detail`）。
 
 ## 核心组件
 
@@ -155,7 +155,7 @@ make
 
 ### 基本使用流程
 
-> 下文示例省略了命名空间前缀：适配器与其类型都在 `namespace sp` 中，实际代码请写 `sp::SerialParserAdapter`，或在源文件中 `using namespace sp;`。
+> 下文示例省略了命名空间前缀：所有适配器、相关类型与解析器都在 `namespace sp` 中，实际代码请写 `sp::SerialParserAdapter`，或在源文件中 `using namespace sp;`。
 
 1. **创建 io_context**
 

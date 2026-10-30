@@ -3,6 +3,8 @@
  */
 #include "StreamParser.h"
 
+namespace sp {
+
 StreamParser::StreamParser(const std::string& tag, uint32_t timeout_ms, size_t max_frame_size)
     : m_max_frame_size(max_frame_size)   // declaration order: m_max_frame_size comes first
     , m_tag(tag)
@@ -107,3 +109,5 @@ std::string StreamParser::toHex(uint8_t byte) {
     oss << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
     return oss.str();
 }
+
+}  // namespace sp

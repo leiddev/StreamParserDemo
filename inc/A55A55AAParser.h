@@ -23,6 +23,8 @@
 #include "StreamParser.h"
 #include <cstdint>
 
+namespace sp {
+
 class A55A55AAParser : public StreamParser {
 public:
     /**
@@ -202,5 +204,7 @@ protected:
         return checksum;
     }
 };
+
+}  // namespace sp
 
 #endif  // !_A55A55AA_STREAM_PARSER_H_
