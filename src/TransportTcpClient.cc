@@ -1,0 +1,112 @@
+/*
+ * TransportTcpClient.cc - TCP client transport for the Transport facade.
+ *
+ * Leid 2026.10
+ *
+ * One link ("host:port") that reconnects on its own; the transport keeps the
+ * connect/disconnect handling out of the business object.
+ */
+#include <chrono>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "StreamParserLog.h"
+#include "TcpClientParserAdapter.h"
+#include "TcpTypes.h"
+#include "TransportImpl.h"
+
+namespace sp {
+namespace detail {
+
+class TcpClientTransport : public TransportBase {
+public:
+    TcpClientTransport(TransportConfig cfg, ParserFactory factory, TransportHandler handler)
+        : TransportBase(std::move(cfg), std::move(factory), std::move(handler)), retry_(io()) {
+        tag_ = config().peer_host + ":" + std::to_string(config().peer_port);
+    }
+
+protected:
+    bool open() override {
+        if (config().peer_host.empty() || config().peer_port == 0) {
+            emitError(config().name, -9, "peer_host / peer_port are not configured");
+            return false;
+        }
+
+        auto parser = makeParser(tag_);
+        client_.reset(new TcpClientParserAdapter(io(), config().peer_host, config().peer_port,
+                                                std::move(parser), TcpClientConfig{}));
+
+        client_->setConnectCallback([this](bool ok, const asio::error_code& ec,
+                                           const std::string& detail) {
+            if (ok) {
+                SP_LOG_INFO("transport", config().name << ": connected to " << tag_);
+                emitLinkUp(tag_);
+                return;
+            }
+            emitError(tag_, -10,
+                      "connect to " + tag_ + " failed: " +
+                          (detail.empty() ? ec.message() : detail));
+            scheduleReconnect();
+        });
+
+        client_->setDisconnectCallback([this](const std::string& closed) {
+            emitLinkDown(closed, "disconnected");
+            scheduleReconnect();
+        });
+
+        addLink(tag_, [this](const Frame& frame, WriteDone done) {
+            std::shared_ptr<TcpClientParserAdapter> client = client_;
+            if (!client || !client->is_open()) {
+                done(false, "not connected");
+                return;
+            }
+            client->async_write(frame, [done](TcpWriteResult result, size_t /*bytes*/,
+                                              const asio::error_code& ec,
+                                              const std::string&      detail) {
+                done(result == TcpWriteResult::Ok, detail.empty() ? ec.message() : detail);
+            });
+        });
+
+        client_->connect();
+        return true;
+    }
+
+    void close() override {
+        retry_.cancel();
+        if (client_) {
+            client_->disconnect();
+            client_.reset();
+        }
+    }
+
+private:
+    void scheduleReconnect() {
+        if (stopping() || config().reconnect_ms == 0 || !client_) {
+            return;
+        }
+        SP_LOG_WARN("transport", config().name << ": reconnecting to " << tag_ << " in "
+                                               << config().reconnect_ms << " ms");
+        retry_.expires_after(std::chrono::milliseconds(config().reconnect_ms));
+        retry_.async_wait([this](const asio::error_code& ec) {
+            if (!ec && !stopping() && client_) {
+                client_->connect();
+            }
+        });
+    }
+
+    std::shared_ptr<TcpClientParserAdapter> client_;
+    asio::steady_timer                      retry_;
+    std::string                             tag_;
+};
+
+}  // namespace detail
+
+std::unique_ptr<Transport> MakeTcpClientTransport(TransportConfig  cfg,
+                                                  ParserFactory    factory,
+                                                  TransportHandler handler) {
+    return std::unique_ptr<Transport>(
+        new detail::TcpClientTransport(std::move(cfg), std::move(factory), std::move(handler)));
+}
+
+}  // namespace sp
